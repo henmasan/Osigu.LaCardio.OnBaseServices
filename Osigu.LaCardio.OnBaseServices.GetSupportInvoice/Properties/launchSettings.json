@@ -1,0 +1,11 @@
+﻿{
+  "profiles": {
+    "SCSE.RCM.Integration.ServiceWorkers.RebillingWorker": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "profiles": {
+    "Osigu.LaCardio.OnBaseServices.GetSupportSettlement": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
