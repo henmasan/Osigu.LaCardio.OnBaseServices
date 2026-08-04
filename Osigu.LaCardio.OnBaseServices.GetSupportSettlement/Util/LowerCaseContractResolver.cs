@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Util
+namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Util
 {
     public class LowerCaseContractResolver : DefaultContractResolver
     {

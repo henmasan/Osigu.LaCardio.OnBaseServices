@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Model
+namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain
 {
     public class IndexOnBaseData
     {

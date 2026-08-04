@@ -1,6 +1,8 @@
 ﻿using Newtonsoft.Json;
-using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Model;
-using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Util;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Util;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -8,16 +10,19 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
-namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
+namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 {
 
     public class DataQueries : IDataQueries
     {
         public readonly Configuration _appsetting;
-        public DataQueries(Configuration appsetting)
+        private readonly ILogger<DataQueries> _logger;
+        public DataQueries(Configuration appsetting, ILogger<DataQueries> logger)
         {
             _appsetting = appsetting;
+            _logger = logger;
         }
         public async Task<List<Invoice>> GetPendingInvoices(string status)
         {
@@ -56,7 +61,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                _logger.LogError(ex, "Error al obtener facturas pendientes");
             }
 
             return invoices;
@@ -95,7 +100,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                _logger.LogError(ex, "Error al obtener facturas pendientes");
             }
             return result;
         }
@@ -135,7 +140,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
                            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                _logger.LogError(ex, "Error al obtener facturas pendientes");
             }
 
             return invoiceWithPrefix;

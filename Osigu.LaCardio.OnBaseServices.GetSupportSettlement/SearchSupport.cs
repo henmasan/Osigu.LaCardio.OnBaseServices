@@ -1,4 +1,6 @@
-﻿using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Model;
+﻿using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,27 +8,27 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
-using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Util;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Util;
 //using System.IO.Compression;
 using Ionic.Zip;
 using System.IO;
 using Microsoft.Extensions.Logging;
 
-namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
+namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 {
 
     public class SearchSupport : ISearchSupport
     {
-        private readonly DataQueries _dataQueries;
+        private readonly IDataQueries _dataQueries;
         private Configuration _appsetting;
         private readonly ILogger<SearchSupport> _logger;
-        public SearchSupport(Configuration appsetting, DataQueries dataQueries, ILogger<SearchSupport> logger)
+        private readonly ISupportDestination _supportDestination;
+        public SearchSupport(Configuration appsetting, IDataQueries dataQueries, ILogger<SearchSupport> logger, ISupportDestination supportDestination)
         {
-
             _appsetting = appsetting;
             _dataQueries = dataQueries;
             _logger = logger;
-
+            _supportDestination = supportDestination;
         }
 
         public async Task FindSupportInFolder()
@@ -99,29 +101,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
             }
         }
 
-        public async Task MoveFiles(List<Support> supports, string InvoiceNumber)
-        {
-            string destinationPath = _appsetting.DestinationData.DetinationPath;
-            try
-            {
-                foreach (var support in supports)
-                {
-
-                    using (StreamWriter writer = new StreamWriter($@"{destinationPath}\Support{InvoiceNumber}.txt", true))
-                    {
-                        writer.WriteLine(support.SupportIndexInfo);
-                    }
-                    FileInfo fileInfo = new FileInfo(support.SupportLocation);
-
-                    File.Move(support.SupportLocation, $"{destinationPath}/{fileInfo.Name}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error al mover soportes: {ex.Message}");
-            }
-
-        }
 
 
         public async Task<ProcessData> MappingFiles(List<string> supportDirectory)
@@ -251,10 +230,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
                     }
                     if (supports.Count > 0)
                     {
-                    
-                        MoveFiles(supports, invoice);
+                        await _supportDestination.DeliverAsync(supports, invoice);
                         _logger.LogInformation($"Se mueve grupo de soportes a ruta de destino");
-
                     }
 
                     supports.Clear();
@@ -359,7 +336,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement
                     supports.Add(support);
                 }
             }
-            MoveFiles(supports, invoice.InvoiceNumber);
+            await _supportDestination.DeliverAsync(supports, invoice.InvoiceNumber);
             processData.Support = supports;
             return processData;
         }
