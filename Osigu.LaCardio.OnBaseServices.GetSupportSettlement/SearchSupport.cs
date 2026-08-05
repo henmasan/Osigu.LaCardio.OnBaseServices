@@ -23,12 +23,14 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
         private AppsettingConfiguration _appsetting;
         private readonly ILogger<SearchSupport> _logger;
         private readonly ISupportDestination _supportDestination;
-        public SearchSupport(AppsettingConfiguration appsetting, IDataQueries dataQueries, ILogger<SearchSupport> logger, ISupportDestination supportDestination)
+        private readonly ISupportClassifier _supportClassifier;
+        public SearchSupport(AppsettingConfiguration appsetting, IDataQueries dataQueries, ILogger<SearchSupport> logger, ISupportDestination supportDestination, ISupportClassifier supportClassifier)
         {
             _appsetting = appsetting;
             _dataQueries = dataQueries;
             _logger = logger;
             _supportDestination = supportDestination;
+            _supportClassifier = supportClassifier;
         }
 
         public async Task FindSupportInFolder()
@@ -135,90 +137,29 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     foreach (var file in files)
                     {
                         FileInfo fileInfo = new FileInfo(file);
+                        Support support = _supportClassifier.ClassifySupport(fileInfo, invoice, filesParameters);
 
-                        Support support = new Support();
-
-
-                        string supportType = string.Empty;
-
-                        List<FileParameters> filterParameters = filesParameters.Where(x => x.Extension == fileInfo.Extension).ToList();
-
-                        foreach (var parameters in filterParameters)
+                        if (!string.IsNullOrWhiteSpace(invoice) && !string.IsNullOrWhiteSpace(support.SupportType))
                         {
-                            supportType = parameters.SupportName.ToString();
-                            string[] fileData = null;
-                            if (parameters.SearchString != null)
-                            {
-                                if (file.ToLower().Contains(parameters.SearchString.ToLower()))
-                                {
-                                    if (parameters.SeparatedName == true)
-                                    {
-                                        if (parameters.Separator != null)
-                                        {
-                                            fileData = fileInfo.Name.Split(parameters.Separator);
-                                            code = fileData[parameters.SectionInvoice - 1].Split('.')[0];
-                                        }
-                                    }
-                                    break;
-                                }
-
-                            }
-                            else
-                            {
-                                if (parameters.SeparatedName == true)
-                                {
-                                    if (parameters.Separator != null)
-                                    {
-                                        fileData = fileInfo.Name.Split(parameters.Separator);
-                                        if (fileData.Length == parameters.SectionNumber)
-                                        {
-                                            code = fileData[parameters.SectionInvoice - 1].Split('.')[0];
-                                        }
-                                    }
-                                    break;
-                                }
-
-                                else
-                                {
-                                    fileData = fileInfo.Name.Split(parameters.Separator);
-                                    code = fileData[parameters.SectionInvoice - 1].Split('.')[0];
-                                    break;
-                                }
-
-                            }
-                        }
-
-                      if (!string.IsNullOrWhiteSpace(invoice))
-                        {
-                            support = new Support();
-                            support.SupportType = supportType;
-                            support.SupportLocation = fileInfo.FullName;
-                            if (fileInfo.Exists)
-                            {
-                                support.SupportExist = true;
-                                support.SupportIndexInfo = $@"{support.SupportType}|{invoice}|{fileInfo.Name}|{code}";
-                            }
-
                             supports.Add(support);
                             _logger.LogInformation($"Indices creados para soporte: {support.SupportType} asociado a factura: {invoice}.");
 
-
-                            if (supportType.ToLower().Contains("cuv") && !files.Any(x => x.ToLower().Contains(".txt")))
+                            if (support.SupportType.ToLower().Contains("cuv") && !files.Any(x => x.ToLower().Contains(".txt")))
                             {
-                                support = new Support();
-                                support.SupportType = $"{supportType}-TEXT";
+                                Support cuvTextSupport = new Support();
+                                cuvTextSupport.SupportType = $"{support.SupportType}-TEXT";
                                 string fileName = Path.GetFileNameWithoutExtension(fileInfo.FullName);
                                 string newFileName = $@"{fileInfo.DirectoryName}\{fileName}.txt";
                                 File.Copy(fileInfo.FullName, newFileName, true);
-                                support.SupportLocation = newFileName;
+                                cuvTextSupport.SupportLocation = newFileName;
                                 if (File.Exists(newFileName))
                                 {
-                                    support.SupportExist = true;
-                                    support.SupportIndexInfo = $@"{support.SupportType}|{invoice}|{fileName}.txt|{code}";
+                                    cuvTextSupport.SupportExist = true;
+                                    string codeValue = support.SupportIndexInfo.Split('|').Length > 3 ? support.SupportIndexInfo.Split('|')[3] : "";
+                                    cuvTextSupport.SupportIndexInfo = $@"{cuvTextSupport.SupportType}|{invoice}|{fileName}.txt|{codeValue}";
                                 }
-                                supports.Add(support);
-                                _logger.LogInformation($"Indices creados para soporte: {support.SupportType} asociado a factura: {invoice}.");
-
+                                supports.Add(cuvTextSupport);
+                                _logger.LogInformation($"Indices creados para soporte: {cuvTextSupport.SupportType} asociado a factura: {invoice}.");
                             }
                         }
                         else
@@ -226,7 +167,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                             processCompleted = false;
                             break;
                         }
-
                     }
                     if (supports.Count > 0)
                     {
