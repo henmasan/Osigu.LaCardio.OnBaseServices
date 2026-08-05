@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
@@ -33,10 +34,27 @@ public class Program
             .ConfigureServices((hostContext, services) =>
             {
                 services.AddSingleton(appSettings.Configuration);
+
+                var rcmSettings = configurationHost.GetSection("RcmApi").Get<RcmApiSettings>();
+                var servinteSettings = configurationHost.GetSection("Servinte").Get<ServinteSettings>();
+                services.AddSingleton(rcmSettings);
+                services.AddSingleton(servinteSettings);
+
                 services.AddSingleton<IDataQueries, DataQueries>();
                 services.AddSingleton<ISupportDestination, FileSystemSupportDestination>();
                 services.AddSingleton<ISearchSupport, SearchSupport>();
+                services.AddSingleton<ISupportClassifier, SupportClassifier>();
+
+                services.AddSingleton<ISupportTraceStore, SqliteSupportTraceStore>();
+                services.AddSingleton<IServinteInvoiceRepository, OracleServinteInvoiceRepository>();
+
+                services.AddHttpClient<IRcmAuthClient, RcmAuthClient>();
+                services.AddHttpClient<IRcmSupportClient, RcmSupportClient>();
+
+                services.AddSingleton<ISendSupportToRcm, SendSupportToRcm>();
+
                 services.AddHostedService<GetSupportWorker>();
+                services.AddHostedService<SendSupportToRcmWorker>();
 
                 services.AddLogging(builder => builder.AddSerilog(
                   new LoggerConfiguration()

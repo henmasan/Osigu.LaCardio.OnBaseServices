@@ -57,9 +57,23 @@ La solución fue crear la carpeta fallback con permisos administrativos:
   * GetSupportWorker.cs: acceso a `_appsetting.Configuration.ExecutionFrecuency`
 - ✅ Proyecto compila exitosamente (sin errores)
 
+**Pasos completados (2026-08-05 sesión 4):**
+4. ✅ Extraer SupportClassifier desde SearchSupport.MappingFiles
+   - Creada interfaz ISupportClassifier en Application/Ports
+   - Implementada clase SupportClassifier con lógica de clasificación
+   - Refactorizado SearchSupport.MappingFiles para usar ISupportClassifier
+   - Commit: refactor: extract SupportClassifier from SearchSupport
+5. ✅ Implementados Domain y Ports para RCM integration
+   - SupportTraceRecord (Domain): modelo de trazabilidad
+   - ISupportTraceStore (Ports): persistencia de trazabilidad
+   - ISendSupportToRcm (Ports): orquestación de envío
+   - IServinteInvoiceRepository (Ports): acceso a Oracle
+   - IRcmAuthClient (Ports): autenticación OAuth2
+   - IRcmSupportClient (Ports): cliente HTTP para upload
+   - DTOs: RcmAuthToken, ServinteInvoiceInfo, RcmUploadRequest, RcmUploadResponse
+   - Commit: feat: add domain models and port interfaces for RCM integration
+
 **Próximos pasos:**
-4. Extraer SupportClassifier desde SearchSupport.MappingFiles (refactor puro)
-5. Implementar Domain/SupportTraceRecord.cs
 6. Implementar SqliteSupportTraceStore (Infrastructure)
 7. Implementar OracleServinteInvoiceRepository (Infrastructure)
 8. Implementar RcmAuthClient con token cacheado (Infrastructure)
