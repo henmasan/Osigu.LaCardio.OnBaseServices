@@ -19,6 +19,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration
         public char PrefixSeparator { get; set; }
         public List<FileParameters> FileParameters { get; set; }
         public DestinationData DestinationData { get; set; }
+        public string RcmStagingPath { get; set; }
 
     }
 

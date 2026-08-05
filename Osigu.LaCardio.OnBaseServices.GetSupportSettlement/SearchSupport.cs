@@ -20,10 +20,10 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
     public class SearchSupport : ISearchSupport
     {
         private readonly IDataQueries _dataQueries;
-        private Configuration _appsetting;
+        private AppsettingConfiguration _appsetting;
         private readonly ILogger<SearchSupport> _logger;
         private readonly ISupportDestination _supportDestination;
-        public SearchSupport(Configuration appsetting, IDataQueries dataQueries, ILogger<SearchSupport> logger, ISupportDestination supportDestination)
+        public SearchSupport(AppsettingConfiguration appsetting, IDataQueries dataQueries, ILogger<SearchSupport> logger, ISupportDestination supportDestination)
         {
             _appsetting = appsetting;
             _dataQueries = dataQueries;
@@ -34,7 +34,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
         public async Task FindSupportInFolder()
         {
 
-            string supportPath = _appsetting.SupportPath;
+            string supportPath = _appsetting.Configuration.SupportPath;
             List<string> DirectoryList = new List<string>();
             List<string> supportDirectoryList = new List<string>();
 
@@ -110,7 +110,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             List<Support> supports = new List<Support>();
             ProcessData processData = new ProcessData();
             bool processCompleted = true;
-            string destinationPath = _appsetting.DestinationData.DetinationPath;
+            string destinationPath = _appsetting.Configuration.DestinationData.DetinationPath;
             _logger.LogInformation($"Ruta destino: {destinationPath}.");
             _logger.LogInformation($"Se encuentran {supportDirectory.Count()} carpetas para procesar.");
             try
@@ -123,7 +123,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     _logger.LogInformation($"{files.Count()} archivos dentro de directorio {directory}.");
 
 
-                    List<FileParameters> filesParameters = _appsetting.FileParameters;
+                    List<FileParameters> filesParameters = _appsetting.Configuration.FileParameters;
 
                     string invoice = Path.GetFileName(directory);
                     invoice= invoice.Substring(2, invoice.Length-2);
@@ -252,27 +252,27 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 
         public async Task<ProcessData> FindSupports(Invoice invoice)
         {
-            if (_appsetting.PrefixSeparator != null)
+            if (_appsetting.Configuration.PrefixSeparator != null)
             {
-                var invoiceData = invoice.InvoiceWithNumber.Split(_appsetting.PrefixSeparator);
+                var invoiceData = invoice.InvoiceWithNumber.Split(_appsetting.Configuration.PrefixSeparator);
                 invoice.InvoicePrefix = invoiceData[0];
                 invoice.InvoiceNumber = invoiceData[1];
             }
             else
             {
-                invoice.InvoicePrefix = invoice.InvoiceWithNumber.Substring(0, _appsetting.PrefixLenght);
-                invoice.InvoiceNumber = invoice.InvoiceWithNumber.Substring(Convert.ToInt32(_appsetting.PrefixLenght), invoice.InvoiceWithNumber.Count() - Convert.ToInt32(_appsetting.PrefixLenght));
+                invoice.InvoicePrefix = invoice.InvoiceWithNumber.Substring(0, _appsetting.Configuration.PrefixLenght);
+                invoice.InvoiceNumber = invoice.InvoiceWithNumber.Substring(Convert.ToInt32(_appsetting.Configuration.PrefixLenght), invoice.InvoiceWithNumber.Count() - Convert.ToInt32(_appsetting.Configuration.PrefixLenght));
             }
             ProcessData processData = new ProcessData();
 
-            DirectoryInfo directoryInfo = new DirectoryInfo(_appsetting.SupportPath);
+            DirectoryInfo directoryInfo = new DirectoryInfo(_appsetting.Configuration.SupportPath);
             List<Support> supports = new List<Support>();
 
             var directory = directoryInfo.GetDirectories(invoice.InvoiceWithNumber);
 
             var files = Directory.GetFiles(directory[0].ToString());
 
-            var filesParameters = _appsetting.FileParameters;
+            var filesParameters = _appsetting.Configuration.FileParameters;
 
 
 

@@ -13,24 +13,21 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Workers
     {
         private readonly ILogger<GetSupportWorker> _logger;
         private readonly ISearchSupport _searchSupport;
-        private Configuration _appsetting;
+        private AppsettingConfiguration _appsetting;
 
-        public GetSupportWorker(ILogger<GetSupportWorker> logger, ISearchSupport searchSupport, Configuration appsetting)
+        public GetSupportWorker(ILogger<GetSupportWorker> logger, ISearchSupport searchSupport, AppsettingConfiguration appsetting)
         {
             _appsetting = appsetting;
             _searchSupport = searchSupport;
             _logger = logger;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-
-
+        {
             while (!stoppingToken.IsCancellationRequested)
             {
                 await _searchSupport.FindSupportInFolder();
-
-
                 _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-                await Task.Delay(_appsetting.ExecutionFrecuency, stoppingToken);
+                await Task.Delay(_appsetting.Configuration.ExecutionFrecuency, stoppingToken);
             }
         }
 

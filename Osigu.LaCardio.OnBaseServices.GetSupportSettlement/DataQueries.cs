@@ -17,9 +17,9 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 
     public class DataQueries : IDataQueries
     {
-        public readonly Configuration _appsetting;
+        public readonly AppsettingConfiguration _appsetting;
         private readonly ILogger<DataQueries> _logger;
-        public DataQueries(Configuration appsetting, ILogger<DataQueries> logger)
+        public DataQueries(AppsettingConfiguration appsetting, ILogger<DataQueries> logger)
         {
             _appsetting = appsetting;
             _logger = logger;
@@ -35,7 +35,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             {
                 string query = "SELECT Id, InvoiceWithNumber, RegistryDate, ProcessData FROM [Reporte].[SoportesValidacionMinisterio] WHERE Status = @status";
 
-                using (SqlConnection con = new SqlConnection(_appsetting.ConnectionString))
+                using (SqlConnection con = new SqlConnection(_appsetting.Configuration.ConnectionString))
                 {
                     using (SqlCommand command = new SqlCommand(query, con))
                     {
@@ -81,7 +81,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                   SET Status =@Status, ProcessData =@processData, InvoiceNumber = @invoiceNumber
                 , InvoicePrefix = @invoicePrefix WHERE ID = @id";
 
-                using (SqlConnection con = new SqlConnection(_appsetting.ConnectionString))
+                using (SqlConnection con = new SqlConnection(_appsetting.Configuration.ConnectionString))
                 {
                     using (SqlCommand command = new SqlCommand(query, con))
                     {
@@ -119,7 +119,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                  inner join hsi.doctype as dt on dt.itemtypenum = i.itemtypenum
                 where i.itemtypenum ='101' and nf.keyvaluechar like '@invoiceNumber'";
 
-                using (SqlConnection con = new SqlConnection(_appsetting.ConnectionString))
+                using (SqlConnection con = new SqlConnection(_appsetting.Configuration.ConnectionString))
                 {
                     using (SqlCommand command = new SqlCommand(query, con))
                     {
