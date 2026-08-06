@@ -4,6 +4,7 @@ using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
@@ -38,6 +39,20 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 
         public async Task SendPendingSupportAsync(SupportTraceRecord trace)
         {
+            ServinteInvoiceInfo invoiceInfo = null;
+            try
+            {
+                invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving invoice {trace.InvoiceNumber} from Servinte");
+            }
+            await SendPendingSupportAsync(trace, invoiceInfo);
+        }
+
+        private async Task SendPendingSupportAsync(SupportTraceRecord trace, ServinteInvoiceInfo invoiceInfo)
+        {
             try
             {
                 _logger.LogInformation($"Processing pending support: Invoice={trace.InvoiceNumber}, Type={trace.SupportType}");
@@ -51,7 +66,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     return;
                 }
 
-                var invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber);
                 if (invoiceInfo == null)
                 {
                     trace.AttemptCount++;
@@ -109,10 +123,29 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
         {
             _logger.LogInformation($"Processing batch of {traces.Count} pending traces");
 
-            foreach (var trace in traces)
+            var groupedByInvoice = traces.GroupBy(t => t.InvoiceNumber);
+
+            foreach (var group in groupedByInvoice)
             {
-                await SendPendingSupportAsync(trace);
-                await Task.Delay(_rcmSettings.DelayBetweenRetriesMs);
+                ServinteInvoiceInfo invoiceInfo = null;
+                try
+                {
+                    invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(group.Key);
+                    if (invoiceInfo != null)
+                    {
+                        _logger.LogInformation($"Retrieved invoice info for {group.Key} (processing {group.Count()} support(s))");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error retrieving invoice {group.Key} from Servinte");
+                }
+
+                foreach (var trace in group)
+                {
+                    await SendPendingSupportAsync(trace, invoiceInfo);
+                    await Task.Delay(_rcmSettings.DelayBetweenRetriesMs);
+                }
             }
 
             _logger.LogInformation("Batch processing completed");
