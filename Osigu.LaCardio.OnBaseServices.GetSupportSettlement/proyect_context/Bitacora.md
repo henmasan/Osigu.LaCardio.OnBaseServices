@@ -96,6 +96,31 @@ Solución implementada en `Application/SendSupportToRcm.cs`:
 - Resultado: 1 consulta Oracle por factura (N soportes), no N consultas.
 - Commit: 51a40bb "perf: group support traces by invoice number to reduce redundant Oracle queries"
 
+**CORRECCIÓN: Mapeo de metadata RCM y estructura del payload (2026-08-06):**
+Se descubrió que la estructura del payload enviado a RCM era **fundamentalmente incorrecta**: la API espera un campo multipart `request_data` con JSON anidado (estructura: `support_file_code`, `events[]`, `support_file_metadata{...}`, `rutafisica`), no campos planos sueltos. Además, casi todos los valores de metadata venían de fuentes incorrectas (hardcoded, Guid.NewGuid, o campos del modelo que no existen en Servinte).
+
+**Exploración del diccionario de datos de Servinte:**
+Se utilizó la skill `osigu-servinte-data-model` para explorar archivos `data/json/Factug13.json`, `Carteg11.json`, `Hcepac4.3.json` y descubrir:
+- **FAMOV** (encabezado factura): PK no es NUMERO_FACTURA simple, sino **(MOVFUE, MOVDOC, MOVEAD)** (Fuente, Documento, Estructura Administrativa)
+- **Convenio**: definido como "código de la empresa responsable del pago" = **FAMOV.MOVCER** (validado vs INEMP.EMPCOD), no hardcodeado
+- **Monto factura**: **CASALLIN.SALLINFAC** (tabla de Saldos en Línea, módulo Cartera), sin necesidad de cruzar con FACARDET (detalle de cargos)
+- **Código electrónico**: **FAENVFAE.ENVFAECUF** (tabla de Facturación Electrónica), tomando la fila más reciente vía ROW_NUMBER
+- **Episodio (origen_event_id)**: **HIEPIINA.EPIINAEPI** (tabla de Episodios de Pacientes Inactivos), relacionada por (MOVHIS, MOVNUM)
+
+**Cambios implementados:**
+1. `ServinteSettings.cs`: reemplazado `RcmAgreementCode` con `InvoiceSourceCode` y `AdministrativeStructureCode` (placeholders en appsettings.json para que el usuario complete con valores reales)
+2. `IServinteInvoiceRepository.cs`: ampliado `ServinteInvoiceInfo` con campos dinámicos: `AgreementCode`, `InvoiceElectronicCode`, `OriginEventId` (se quitó `InvoiceNumber` redundante)
+3. `OracleServinteInvoiceRepository.cs`: nueva consulta SQL con LEFT JOINs a CASALLIN, FAENVFAE (última fila), HIEPIINA; parámetros por `(MOVFUE, MOVDOC, MOVEAD)`
+4. `IRcmSupportClient.cs`: RcmUploadRequest ampliado con nuevos campos: `AgreementDate`, `InvoiceAmount`, `InvoiceDateTime`, `DocumentTypeNumber`, `AgreementDate`
+5. `RcmSupportClient.cs`: reescrito para armar JSON anidado correcto vía `Newtonsoft.Json`; multipart con único campo `request_data` (aplicación/json)
+6. `SendSupportToRcm.cs`: construcción de `RcmUploadRequest` ahora desde `ServinteInvoiceInfo` dinámico; loguea warning si episodio no encontrado; `DocumentType = supportFileCode` (no fijo)
+7. Commit: db69421 "feat: correct RCM metadata mapping..."
+
+**Pendientes de validar (TODO de negocio):**
+- `agreement_date`: actualmente enviado como string vacío; requiere regla de negocio (¿es la fecha de la factura, fecha del convenio, o la del envío?)
+- `process_id`: mantiene Guid.NewGuid(); ¿es requerido ser dinámico o puede ser un contador secuencial?
+- `InvoiceSourceCode` y `AdministrativeStructureCode` en appsettings.json: usuario **debe completar** con los valores reales antes de probar contra Oracle real
+
 **Próximos pasos:**
 6. Implementar SqliteSupportTraceStore (Infrastructure)
 7. Implementar OracleServinteInvoiceRepository (Infrastructure)
