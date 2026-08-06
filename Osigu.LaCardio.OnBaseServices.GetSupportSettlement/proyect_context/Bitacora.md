@@ -83,6 +83,19 @@ Cambio:
 - No se requirieron cambios en otros archivos (el DI ya tenía todo registrado).
 - Commit: cda6d3f "feat: register support trace when moving files to RcmStagingPath"
 
+**OPTIMIZACIÓN: Agrupación de consultas a Servinte (2026-08-06):**
+Se descubrió que al procesar soportes pendientes, se consultaba Oracle (Servinte) una vez **por cada trace individual**, incluso si varios comparten el mismo `InvoiceNumber` (ej. una factura con soportes FACTURA, CUV, CUV-TEXT generaba 3 traces pendientes = 3 consultas Oracle idénticas a la misma factura).
+
+Solución implementada en `Application/SendSupportToRcm.cs`:
+- Refactorizar `SendPendingSupportAsync` en dos versiones: pública (obtiene invoiceInfo) que delega a privada (recibe invoiceInfo como parámetro).
+- Reescribir `SendBatchAsync` para:
+  * Agrupar traces por `InvoiceNumber` usando `GroupBy(t => t.InvoiceNumber)`
+  * Consultar Servinte una sola vez por grupo (por factura única)
+  * Reutilizar `ServinteInvoiceInfo` para todos los traces de esa factura
+  * Mantener delay por-trace hacia RCM API (preserva throttling actual)
+- Resultado: 1 consulta Oracle por factura (N soportes), no N consultas.
+- Commit: 51a40bb "perf: group support traces by invoice number to reduce redundant Oracle queries"
+
 **Próximos pasos:**
 6. Implementar SqliteSupportTraceStore (Infrastructure)
 7. Implementar OracleServinteInvoiceRepository (Infrastructure)
