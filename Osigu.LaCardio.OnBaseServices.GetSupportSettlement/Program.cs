@@ -33,7 +33,7 @@ public class Program
         return Host.CreateDefaultBuilder(args)
             .ConfigureServices((hostContext, services) =>
             {
-                services.AddSingleton(appSettings.Configuration);
+                services.AddSingleton(appSettings);
 
                 var rcmSettings = configurationHost.GetSection("RcmApi").Get<RcmApiSettings>();
                 var servinteSettings = configurationHost.GetSection("Servinte").Get<ServinteSettings>();
@@ -54,7 +54,7 @@ public class Program
                 services.AddSingleton<ISendSupportToRcm, SendSupportToRcm>();
 
                 services.AddHostedService<GetSupportWorker>();
-                services.AddHostedService<SendSupportToRcmWorker>();
+                //services.AddHostedService<SendSupportToRcmWorker>();
 
                 services.AddLogging(builder => builder.AddSerilog(
                   new LoggerConfiguration()
