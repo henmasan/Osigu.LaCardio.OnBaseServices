@@ -116,6 +116,14 @@ Se utilizó la skill `osigu-servinte-data-model` para explorar archivos `data/js
 6. `SendSupportToRcm.cs`: construcción de `RcmUploadRequest` ahora desde `ServinteInvoiceInfo` dinámico; loguea warning si episodio no encontrado; `DocumentType = supportFileCode` (no fijo)
 7. Commit: db69421 "feat: correct RCM metadata mapping..."
 
+**CORRECCIÓN: Fuente de monto de factura (2026-08-06):**
+Tras revisión adicional, se descubrió que la fuente correcta del monto es **CACAR.CARVAL** (DETALLE DE MOVIMIENTOS DE CARTERA), no CASALLIN.SALLINFAC. CARVAL contiene ya el valor completo de la factura, sin necesidad de agregación. 
+
+Cambios:
+- Reemplazado JOIN: `CACAR c ON c.CARFUE = h.MOVFUE AND c.CARDOC = h.MOVDOC`
+- Eliminado SUM() y GROUP BY (no se necesitaban)
+- Commit: dc671b7 "fix: correct invoice amount source from CACAR.CARVAL..."
+
 **Pendientes de validar (TODO de negocio):**
 - `agreement_date`: actualmente enviado como string vacío; requiere regla de negocio (¿es la fecha de la factura, fecha del convenio, o la del envío?)
 - `process_id`: mantiene Guid.NewGuid(); ¿es requerido ser dinámico o puede ser un contador secuencial?
