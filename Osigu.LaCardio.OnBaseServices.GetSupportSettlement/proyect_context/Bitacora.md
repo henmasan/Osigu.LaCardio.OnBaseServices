@@ -73,6 +73,16 @@ La solución fue crear la carpeta fallback con permisos administrativos:
    - DTOs: RcmAuthToken, ServinteInvoiceInfo, RcmUploadRequest, RcmUploadResponse
    - Commit: feat: add domain models and port interfaces for RCM integration
 
+**BLOQUEADOR RESUELTO (2026-08-06):**
+Se descubrió que la tabla `SupportTrace` (SQLite local) nunca recibía inserts porque `ISupportTraceStore.AddTraceAsync` nunca era invocado en ningún punto del código. Esto causaba que `SendSupportToRcmWorker` siempre encontrara la cola vacía (`GetPendingTracesAsync()` retornaba lista vacía) y se quedara suspendido.
+
+Solución: Inyectar `ISupportTraceStore` en `FileSystemSupportDestination` y registrar un `SupportTraceRecord` con estado "Pending" inmediatamente después de mover cada archivo a `RcmStagingPath`. Esto conecta al fin el productor (movimiento de archivos) con el consumidor (procesamiento de cola RCM).
+
+Cambio:
+- `FileSystemSupportDestination.cs`: inyectar `ISupportTraceStore`, después de `File.Move(...)` (línea ~49) llamar a `_traceStore.AddTraceAsync(...)` con los datos: `InvoiceNumber`, `SupportType`, `FilePath` (ruta final en staging), `Status = "Pending"`, `AttemptCount = 0`.
+- No se requirieron cambios en otros archivos (el DI ya tenía todo registrado).
+- Commit: cda6d3f "feat: register support trace when moving files to RcmStagingPath"
+
 **Próximos pasos:**
 6. Implementar SqliteSupportTraceStore (Infrastructure)
 7. Implementar OracleServinteInvoiceRepository (Infrastructure)
