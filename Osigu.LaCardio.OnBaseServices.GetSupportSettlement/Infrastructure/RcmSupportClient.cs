@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using System;
 using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
@@ -45,20 +46,28 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     fileContent.Headers.Add("Content-Type", "application/octet-stream");
                     multipartContent.Add(fileContent, "file", Path.GetFileName(request.FilePath));
 
-                    // Add metadata
-                    multipartContent.Add(new StringContent(request.InvoiceNumber), "invoice_number");
-                    multipartContent.Add(new StringContent(request.SupportFileCode), "support_file_code");
-                    multipartContent.Add(new StringContent(request.AgreementCode), "agreement_code");
-                    multipartContent.Add(new StringContent(request.DocumentType), "document_type");
-
-                    if (!string.IsNullOrEmpty(request.OriginEventId))
-                        multipartContent.Add(new StringContent(request.OriginEventId), "origin_event_id");
-
-                    if (!string.IsNullOrEmpty(request.ProcessId))
-                        multipartContent.Add(new StringContent(request.ProcessId), "process_id");
-
-                    if (!string.IsNullOrEmpty(request.InvoiceElectronicCode))
-                        multipartContent.Add(new StringContent(request.InvoiceElectronicCode), "invoice_electronic_code");
+                    // Build request_data JSON payload with nested structure
+                    var requestData = new
+                    {
+                        support_file_code = request.SupportFileCode,
+                        events = new[] { new { origin_event_id = request.OriginEventId, agreement_code = request.AgreementCode } },
+                        support_file_metadata = new
+                        {
+                            status = "OK",
+                            process_id = request.ProcessId,
+                            document_type = request.DocumentType,
+                            agreement_date = request.AgreementDate,
+                            invoice_amount = request.InvoiceAmount,
+                            invoice_number = request.InvoiceNumber,
+                            invoice_date_time = request.InvoiceDateTime,
+                            document_type_number = request.DocumentTypeNumber,
+                            invoice_electronic_code = request.InvoiceElectronicCode,
+                            unique_verification_code = (string)null
+                        },
+                        rutafisica = (string)null
+                    };
+                    var requestDataJson = JsonConvert.SerializeObject(requestData);
+                    multipartContent.Add(new StringContent(requestDataJson, Encoding.UTF8, "application/json"), "request_data");
 
                     using (var httpRequest = new HttpRequestMessage(HttpMethod.Post, uploadUrl))
                     {

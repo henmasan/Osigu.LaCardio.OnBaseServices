@@ -5,9 +5,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports
 {
     public class ServinteInvoiceInfo
     {
-        public string InvoiceNumber { get; set; }
         public DateTime InvoiceDate { get; set; }
         public decimal Amount { get; set; }
+        public string AgreementCode { get; set; }
+        public string InvoiceElectronicCode { get; set; }
+        public string OriginEventId { get; set; }
     }
 
     public interface IServinteInvoiceRepository

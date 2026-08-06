@@ -78,17 +78,27 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 
                 var token = await _rcmAuthClient.GetTokenAsync();
 
+                var supportFileCode = GetSupportFileCode(trace.SupportType);
                 var uploadRequest = new RcmUploadRequest
                 {
-                    InvoiceNumber = trace.InvoiceNumber,
-                    SupportFileCode = GetSupportFileCode(trace.SupportType),
-                    AgreementCode = _servinteSettings.RcmAgreementCode,
-                    DocumentType = "SUPPORT",
-                    FilePath = trace.FilePath,
-                    OriginEventId = Guid.NewGuid().ToString(),
+                    SupportFileCode = supportFileCode,
+                    AgreementCode = invoiceInfo.AgreementCode,
+                    OriginEventId = invoiceInfo.OriginEventId ?? string.Empty,
                     ProcessId = Guid.NewGuid().ToString(),
-                    InvoiceElectronicCode = invoiceInfo.InvoiceNumber
+                    DocumentType = supportFileCode,
+                    AgreementDate = string.Empty,
+                    InvoiceAmount = invoiceInfo.Amount,
+                    InvoiceNumber = trace.InvoiceNumber,
+                    InvoiceDateTime = invoiceInfo.InvoiceDate == DateTime.MinValue ? (DateTime?)null : invoiceInfo.InvoiceDate,
+                    DocumentTypeNumber = trace.InvoiceNumber,
+                    InvoiceElectronicCode = invoiceInfo.InvoiceElectronicCode,
+                    FilePath = trace.FilePath
                 };
+
+                if (string.IsNullOrEmpty(invoiceInfo.OriginEventId))
+                {
+                    _logger.LogWarning($"Origin event ID (episodio) not found for invoice {trace.InvoiceNumber}");
+                }
 
                 var response = await _rcmSupportClient.UploadSupportAsync(uploadRequest, token.AccessToken);
 

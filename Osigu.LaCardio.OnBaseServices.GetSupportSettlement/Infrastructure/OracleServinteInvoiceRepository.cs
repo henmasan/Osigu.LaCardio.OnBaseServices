@@ -30,31 +30,57 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     {
                         command.CommandText = @"
                             SELECT
-                                h.NUMERO_FACTURA as invoice_number,
-                                h.FECHA_EMISION as invoice_date,
-                                h.VALOR_TOTAL as amount
-                            FROM
-                                SERVINTE.FAMOV h
-                            WHERE
-                                h.NUMERO_FACTURA = :invoice_number
-                            AND ROWNUM = 1
+                                h.MOVFEC        AS invoice_date,
+                                h.MOVCER        AS agreement_code,
+                                s.SALLINFAC     AS amount,
+                                e.ENVFAECUF     AS invoice_electronic_code,
+                                p.EPIINAEPI     AS episode_number
+                            FROM SERVINTE.FAMOV h
+                            LEFT JOIN SERVINTE.CASALLIN s
+                                ON s.SALLINFUE = h.MOVFUE AND s.SALLINDOC = h.MOVDOC
+                            LEFT JOIN (
+                                SELECT ENVFAEFUE, ENVFAEDOC, ENVFAEEAD, ENVFAECUF
+                                FROM (
+                                    SELECT ENVFAEFUE, ENVFAEDOC, ENVFAEEAD, ENVFAECUF,
+                                           ROW_NUMBER() OVER (PARTITION BY ENVFAEFUE, ENVFAEDOC, ENVFAEEAD ORDER BY ENVFAESFE DESC) rn
+                                    FROM SERVINTE.FAENVFAE
+                                ) WHERE rn = 1
+                            ) e ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD
+                            LEFT JOIN SERVINTE.HIEPIINA p
+                                ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
+                            WHERE h.MOVFUE = :fue AND h.MOVDOC = :doc AND h.MOVEAD = :ead
                         ";
 
-                        var param = new OracleParameter(":invoice_number", invoiceNumber);
-                        command.Parameters.Add(param);
+                        var fuente = new OracleParameter(":fue", _servinteSettings.InvoiceSourceCode);
+                        var documento = new OracleParameter(":doc", Convert.ToInt32(invoiceNumber));
+                        var ead = new OracleParameter(":ead", _servinteSettings.AdministrativeStructureCode);
+
+                        command.Parameters.Add(fuente);
+                        command.Parameters.Add(documento);
+                        command.Parameters.Add(ead);
 
                         using (var reader = await command.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
                             {
-                                var invoiceDate = reader.IsDBNull(1) ? DateTime.MinValue : reader.GetDateTime(1);
+                                var invoiceDate = reader.IsDBNull(0) ? DateTime.MinValue : reader.GetDateTime(0);
+                                var agreementCode = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
                                 var amount = reader.IsDBNull(2) ? 0m : (decimal)reader.GetDouble(2);
+                                var invoiceElectronicCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
+                                var originEventId = reader.IsDBNull(4) ? string.Empty : reader.GetInt32(4).ToString();
+
+                                if (string.IsNullOrEmpty(originEventId))
+                                {
+                                    _logger.LogWarning($"Episode (EPIINAEPI) not found for invoice {invoiceNumber}");
+                                }
 
                                 return new ServinteInvoiceInfo
                                 {
-                                    InvoiceNumber = reader.GetString(0),
                                     InvoiceDate = invoiceDate,
-                                    Amount = amount
+                                    Amount = amount,
+                                    AgreementCode = agreementCode,
+                                    InvoiceElectronicCode = invoiceElectronicCode,
+                                    OriginEventId = originEventId
                                 };
                             }
                         }
