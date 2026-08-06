@@ -15,11 +15,13 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
     {
         private readonly AppsettingConfiguration _appsetting;
         private readonly ILogger<FileSystemSupportDestination> _logger;
+        private readonly ISupportTraceStore _traceStore;
 
-        public FileSystemSupportDestination(AppsettingConfiguration appsetting, ILogger<FileSystemSupportDestination> logger)
+        public FileSystemSupportDestination(AppsettingConfiguration appsetting, ILogger<FileSystemSupportDestination> logger, ISupportTraceStore traceStore)
         {
             _appsetting = appsetting;
             _logger = logger;
+            _traceStore = traceStore;
         }
 
         public async Task DeliverAsync(List<Support> supports, string invoiceNumber)
@@ -48,6 +50,18 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     Directory.CreateDirectory(rcmStagingPath);
                     File.Move(support.SupportLocation, rcmStagingFile, overwrite: true);
                     _logger.LogInformation($"Archivo movido a staging de RCM: {rcmStagingFile}");
+
+                    // Register trace record for RCM queue processing
+                    var traceRecord = new SupportTraceRecord
+                    {
+                        InvoiceNumber = invoiceNumber,
+                        SupportType = support.SupportType,
+                        FilePath = rcmStagingFile,
+                        Status = "Pending",
+                        AttemptCount = 0
+                    };
+                    await _traceStore.AddTraceAsync(traceRecord);
+                    _logger.LogInformation($"Trazabilidad registrada (Pending) para soporte {support.SupportType} de factura {invoiceNumber}");
                 }
             }
             catch (Exception ex)
