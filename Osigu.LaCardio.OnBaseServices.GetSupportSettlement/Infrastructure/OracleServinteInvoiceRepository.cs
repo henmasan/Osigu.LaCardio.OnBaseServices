@@ -32,12 +32,12 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             SELECT
                                 h.MOVFEC        AS invoice_date,
                                 h.MOVCER        AS agreement_code,
-                                s.SALLINFAC     AS amount,
+                                c.CARVAL        AS amount,
                                 e.ENVFAECUF     AS invoice_electronic_code,
                                 p.EPIINAEPI     AS episode_number
                             FROM SERVINTE.FAMOV h
-                            LEFT JOIN SERVINTE.CASALLIN s
-                                ON s.SALLINFUE = h.MOVFUE AND s.SALLINDOC = h.MOVDOC
+                            LEFT JOIN SERVINTE.CACAR c
+                                ON c.CARFUE = h.MOVFUE AND c.CARDOC = h.MOVDOC
                             LEFT JOIN (
                                 SELECT ENVFAEFUE, ENVFAEDOC, ENVFAEEAD, ENVFAECUF
                                 FROM (
