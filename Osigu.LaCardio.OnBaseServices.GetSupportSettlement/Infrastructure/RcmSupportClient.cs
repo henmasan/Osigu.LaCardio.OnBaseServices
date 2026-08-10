@@ -62,7 +62,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             invoice_date_time = request.InvoiceDateTime,
                             document_type_number = request.DocumentTypeNumber,
                             invoice_electronic_code = request.InvoiceElectronicCode,
-                            unique_verification_code = (string)null
+                            unique_verification_code = request.UniqueVerificationCode
                         },
                         rutafisica = (string)null
                     };

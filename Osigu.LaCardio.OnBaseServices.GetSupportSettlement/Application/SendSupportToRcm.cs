@@ -84,7 +84,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     SupportFileCode = supportFileCode,
                     AgreementCode = invoiceInfo.AgreementCode,
                     OriginEventId = invoiceInfo.OriginEventId ?? string.Empty,
-                    ProcessId = Guid.NewGuid().ToString(),
+                    ProcessId = trace.ProcessId,
                     DocumentType = supportFileCode,
                     AgreementDate = string.Empty,
                     InvoiceAmount = invoiceInfo.Amount,
@@ -92,6 +92,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     InvoiceDateTime = invoiceInfo.InvoiceDate == DateTime.MinValue ? (DateTime?)null : invoiceInfo.InvoiceDate,
                     DocumentTypeNumber = trace.InvoiceNumber,
                     InvoiceElectronicCode = invoiceInfo.InvoiceElectronicCode,
+                    UniqueVerificationCode = trace.UniqueVerificationCode,
                     FilePath = trace.FilePath
                 };
 

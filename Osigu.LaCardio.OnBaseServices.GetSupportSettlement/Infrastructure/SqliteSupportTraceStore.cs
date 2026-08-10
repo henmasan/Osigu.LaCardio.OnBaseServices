@@ -41,13 +41,38 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                 ErrorMessage TEXT,
                                 CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                FilePath TEXT
+                                FilePath TEXT,
+                                ProcessId TEXT,
+                                UniqueVerificationCode TEXT
                             );
 
                             CREATE INDEX IF NOT EXISTS idx_invoice_support
                             ON SupportTrace(InvoiceNumber, SupportType);
                         ";
                         command.ExecuteNonQuery();
+
+                        // Migrate existing databases: add columns if they don't exist
+                        command.CommandText = "PRAGMA table_info(SupportTrace)";
+                        var columns = new HashSet<string>();
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                columns.Add(reader.GetString(1)); // column name is at index 1
+                            }
+                        }
+
+                        if (!columns.Contains("ProcessId"))
+                        {
+                            command.CommandText = "ALTER TABLE SupportTrace ADD COLUMN ProcessId TEXT";
+                            command.ExecuteNonQuery();
+                        }
+
+                        if (!columns.Contains("UniqueVerificationCode"))
+                        {
+                            command.CommandText = "ALTER TABLE SupportTrace ADD COLUMN UniqueVerificationCode TEXT";
+                            command.ExecuteNonQuery();
+                        }
                     }
                 }
                 _logger.LogInformation($"SQLite database initialized at {_databasePath}");
@@ -68,8 +93,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = @"
-                            INSERT INTO SupportTrace (InvoiceNumber, SupportType, AttemptCount, Status, FilePath)
-                            VALUES (@invoice, @supportType, @attempts, @status, @filePath);
+                            INSERT INTO SupportTrace (InvoiceNumber, SupportType, AttemptCount, Status, FilePath, ProcessId, UniqueVerificationCode)
+                            VALUES (@invoice, @supportType, @attempts, @status, @filePath, @processId, @uniqueVerificationCode);
                             SELECT last_insert_rowid();
                         ";
                         command.Parameters.AddWithValue("@invoice", record.InvoiceNumber ?? "");
@@ -77,6 +102,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                         command.Parameters.AddWithValue("@attempts", record.AttemptCount);
                         command.Parameters.AddWithValue("@status", record.Status ?? "Pending");
                         command.Parameters.AddWithValue("@filePath", record.FilePath ?? "");
+                        command.Parameters.AddWithValue("@processId", (object?)record.ProcessId ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@uniqueVerificationCode", (object?)record.UniqueVerificationCode ?? DBNull.Value);
 
                         var id = (long?)await command.ExecuteScalarAsync() ?? 0;
                         record.Id = (int)id;
@@ -249,7 +276,9 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 ErrorMessage = reader.IsDBNull(6) ? null : reader.GetString(6),
                 CreatedAt = reader.IsDBNull(7) ? DateTime.UtcNow : reader.GetDateTime(7),
                 UpdatedAt = reader.IsDBNull(8) ? DateTime.UtcNow : reader.GetDateTime(8),
-                FilePath = reader.IsDBNull(9) ? null : reader.GetString(9)
+                FilePath = reader.IsDBNull(9) ? null : reader.GetString(9),
+                ProcessId = reader.FieldCount > 10 && !reader.IsDBNull(10) ? reader.GetString(10) : null,
+                UniqueVerificationCode = reader.FieldCount > 11 && !reader.IsDBNull(11) ? reader.GetString(11) : null
             };
         }
     }

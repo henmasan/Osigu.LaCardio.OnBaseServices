@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 {
@@ -22,6 +23,28 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             _appsetting = appsetting;
             _logger = logger;
             _traceStore = traceStore;
+        }
+
+        private static bool IsCuvSupport(string supportType)
+        {
+            if (string.IsNullOrWhiteSpace(supportType)) return false;
+            var lower = supportType.ToLowerInvariant();
+            return lower.Contains("cuv") && !lower.Contains("text");
+        }
+
+        private (string? ProcessId, string? UniqueVerificationCode) TryReadCuvValidationData(string filePath)
+        {
+            try
+            {
+                var json = File.ReadAllText(filePath);
+                var cuv = JsonConvert.DeserializeObject<CuvValidationResult>(json);
+                return (cuv?.ProcesoId.ToString(), cuv?.CodigoUnicoValidacion);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"No se pudo extraer datos de validación CUV desde {filePath}");
+                return (null, null);
+            }
         }
 
         public async Task DeliverAsync(List<Support> supports, string invoiceNumber)
@@ -51,6 +74,14 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     File.Move(support.SupportLocation, rcmStagingFile, overwrite: true);
                     _logger.LogInformation($"Archivo movido a staging de RCM: {rcmStagingFile}");
 
+                    // Extract CUV validation data if this is a CUV support
+                    string? cuvProcessId = null;
+                    string? cuvUniqueVerificationCode = null;
+                    if (IsCuvSupport(support.SupportType))
+                    {
+                        (cuvProcessId, cuvUniqueVerificationCode) = TryReadCuvValidationData(rcmStagingFile);
+                    }
+
                     // Register trace record for RCM queue processing
                     var traceRecord = new SupportTraceRecord
                     {
@@ -58,7 +89,9 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                         SupportType = support.SupportType,
                         FilePath = rcmStagingFile,
                         Status = "Pending",
-                        AttemptCount = 0
+                        AttemptCount = 0,
+                        ProcessId = cuvProcessId,
+                        UniqueVerificationCode = cuvUniqueVerificationCode
                     };
                     await _traceStore.AddTraceAsync(traceRecord);
                     _logger.LogInformation($"Trazabilidad registrada (Pending) para soporte {support.SupportType} de factura {invoiceNumber}");

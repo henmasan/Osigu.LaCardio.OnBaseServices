@@ -14,5 +14,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public string? FilePath { get; set; }
+        public string? ProcessId { get; set; }
+        public string? UniqueVerificationCode { get; set; }
     }
 }
