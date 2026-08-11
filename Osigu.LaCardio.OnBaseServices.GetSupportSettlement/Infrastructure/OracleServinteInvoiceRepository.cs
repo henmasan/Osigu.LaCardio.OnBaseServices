@@ -29,7 +29,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = @"
-                            SELECT
+                            SELECT DISTINCT
                                 h.MOVFEC        AS invoice_date,
                                 h.MOVCER        AS agreement_code,
                                 c.CARVAL        AS amount,
@@ -38,17 +38,13 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             FROM SERVINTE.FAMOV h
                             LEFT JOIN SERVINTE.CACAR c
                                 ON c.CARFUE = h.MOVFUE AND c.CARDOC = h.MOVDOC
-                            LEFT JOIN (
-                                SELECT ENVFAEFUE, ENVFAEDOC, ENVFAEEAD, ENVFAECUF
-                                FROM (
-                                    SELECT ENVFAEFUE, ENVFAEDOC, ENVFAEEAD, ENVFAECUF,
-                                           ROW_NUMBER() OVER (PARTITION BY ENVFAEFUE, ENVFAEDOC, ENVFAEEAD ORDER BY ENVFAESFE DESC) rn
-                                    FROM SERVINTE.FAENVFAE
-                                ) WHERE rn = 1
-                            ) e ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD
+                            INNER JOIN SERVINTE.CAENC ca
+                                ON ca.ENCFUE = h.MOVFUE AND ca.ENCDOC = h.MOVDOC AND ca.ENCSED = h.MOVEAD
+                            LEFT JOIN SERVINTE.FAENVFAE e
+                                ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD AND e.ENVFAEERR = 'N'
                             LEFT JOIN SERVINTE.HIEPIINA p
                                 ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
-                            WHERE h.MOVFUE = :fue AND h.MOVDOC = :doc AND h.MOVEAD = :ead
+                            WHERE e.ENVFAECUF IS NOT NULL AND h.MOVFUE = :fue AND h.MOVDOC = :doc AND h.MOVEAD = :ead
                         ";
 
                         var fuente = new OracleParameter(":fue", _servinteSettings.InvoiceSourceCode);
