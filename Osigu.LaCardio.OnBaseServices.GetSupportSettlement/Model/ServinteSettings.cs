@@ -7,8 +7,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration
         public string ConnectionString { get; set; }
         public string TraceDatabasePath { get; set; }
         public int RcmSendExecutionFrequency { get; set; }
-        public string InvoiceSourceCode { get; set; }
-        public string AdministrativeStructureCode { get; set; }
         public Dictionary<string, string> SupportFileCodeMapping { get; set; }
     }
 }

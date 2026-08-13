@@ -43,7 +43,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                 UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 FilePath TEXT,
                                 ProcessId TEXT,
-                                UniqueVerificationCode TEXT
+                                UniqueVerificationCode TEXT,
+                                SourceCode TEXT
                             );
 
                             CREATE INDEX IF NOT EXISTS idx_invoice_support
@@ -73,6 +74,12 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             command.CommandText = "ALTER TABLE SupportTrace ADD COLUMN UniqueVerificationCode TEXT";
                             command.ExecuteNonQuery();
                         }
+
+                        if (!columns.Contains("SourceCode"))
+                        {
+                            command.CommandText = "ALTER TABLE SupportTrace ADD COLUMN SourceCode TEXT";
+                            command.ExecuteNonQuery();
+                        }
                     }
                 }
                 _logger.LogInformation($"SQLite database initialized at {_databasePath}");
@@ -93,8 +100,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = @"
-                            INSERT INTO SupportTrace (InvoiceNumber, SupportType, AttemptCount, Status, FilePath, ProcessId, UniqueVerificationCode)
-                            VALUES (@invoice, @supportType, @attempts, @status, @filePath, @processId, @uniqueVerificationCode);
+                            INSERT INTO SupportTrace (InvoiceNumber, SupportType, AttemptCount, Status, FilePath, ProcessId, UniqueVerificationCode, SourceCode)
+                            VALUES (@invoice, @supportType, @attempts, @status, @filePath, @processId, @uniqueVerificationCode, @sourceCode);
                             SELECT last_insert_rowid();
                         ";
                         command.Parameters.AddWithValue("@invoice", record.InvoiceNumber ?? "");
@@ -104,6 +111,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                         command.Parameters.AddWithValue("@filePath", record.FilePath ?? "");
                         command.Parameters.AddWithValue("@processId", (object?)record.ProcessId ?? DBNull.Value);
                         command.Parameters.AddWithValue("@uniqueVerificationCode", (object?)record.UniqueVerificationCode ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@sourceCode", (object?)record.SourceCode ?? DBNull.Value);
 
                         var id = (long?)await command.ExecuteScalarAsync() ?? 0;
                         record.Id = (int)id;
@@ -278,7 +286,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 UpdatedAt = reader.IsDBNull(8) ? DateTime.UtcNow : reader.GetDateTime(8),
                 FilePath = reader.IsDBNull(9) ? null : reader.GetString(9),
                 ProcessId = reader.FieldCount > 10 && !reader.IsDBNull(10) ? reader.GetString(10) : null,
-                UniqueVerificationCode = reader.FieldCount > 11 && !reader.IsDBNull(11) ? reader.GetString(11) : null
+                UniqueVerificationCode = reader.FieldCount > 11 && !reader.IsDBNull(11) ? reader.GetString(11) : null,
+                SourceCode = reader.FieldCount > 12 && !reader.IsDBNull(12) ? reader.GetString(12) : null
             };
         }
     }

@@ -148,6 +148,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                             {
                                 Support cuvTextSupport = new Support();
                                 cuvTextSupport.SupportType = $"{support.SupportType}-TEXT";
+                                cuvTextSupport.SourceCode = support.SourceCode;
                                 string fileName = Path.GetFileNameWithoutExtension(fileInfo.FullName);
                                 string newFileName = $@"{fileInfo.DirectoryName}\{fileName}.txt";
                                 File.Copy(fileInfo.FullName, newFileName, true);

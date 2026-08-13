@@ -18,7 +18,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             _logger = logger;
         }
 
-        public async Task<ServinteInvoiceInfo> GetInvoiceInfoAsync(string invoiceNumber)
+        public async Task<ServinteInvoiceInfo> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode)
         {
             try
             {
@@ -44,16 +44,14 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                 ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD AND e.ENVFAEERR = 'N'
                             LEFT JOIN SERVINTE.HIEPIINA p
                                 ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
-                            WHERE e.ENVFAECUF IS NOT NULL AND h.MOVFUE = :fue AND h.MOVDOC = :doc AND h.MOVEAD = :ead
+                            WHERE e.ENVFAECUF IS NOT NULL AND h.MOVFUE = :fue AND h.MOVDOC = :doc
                         ";
 
-                        var fuente = new OracleParameter(":fue", _servinteSettings.InvoiceSourceCode);
+                        var fuente = new OracleParameter(":fue", sourceCode);
                         var documento = new OracleParameter(":doc", Convert.ToInt32(invoiceNumber));
-                        var ead = new OracleParameter(":ead", _servinteSettings.AdministrativeStructureCode);
 
                         command.Parameters.Add(fuente);
                         command.Parameters.Add(documento);
-                        command.Parameters.Add(ead);
 
                         using (var reader = await command.ExecuteReaderAsync())
                         {

@@ -42,7 +42,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             ServinteInvoiceInfo invoiceInfo = null;
             try
             {
-                invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber);
+                invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber, trace.SourceCode);
             }
             catch (Exception ex)
             {
@@ -141,7 +141,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 ServinteInvoiceInfo invoiceInfo = null;
                 try
                 {
-                    invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(group.Key);
+                    invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(group.Key, group.First().SourceCode);
                     if (invoiceInfo != null)
                     {
                         _logger.LogInformation($"Retrieved invoice info for {group.Key} (processing {group.Count()} support(s))");

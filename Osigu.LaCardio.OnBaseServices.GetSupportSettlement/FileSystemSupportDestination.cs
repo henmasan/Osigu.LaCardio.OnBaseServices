@@ -91,7 +91,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                         Status = "Pending",
                         AttemptCount = 0,
                         ProcessId = cuvProcessId,
-                        UniqueVerificationCode = cuvUniqueVerificationCode
+                        UniqueVerificationCode = cuvUniqueVerificationCode,
+                        SourceCode = support.SourceCode
                     };
                     await _traceStore.AddTraceAsync(traceRecord);
                     _logger.LogInformation($"Trazabilidad registrada (Pending) para soporte {support.SupportType} de factura {invoiceNumber}");

@@ -14,6 +14,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports
 
     public interface IServinteInvoiceRepository
     {
-        Task<ServinteInvoiceInfo> GetInvoiceInfoAsync(string invoiceNumber);
+        Task<ServinteInvoiceInfo> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode);
     }
 }

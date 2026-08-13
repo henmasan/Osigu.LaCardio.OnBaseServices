@@ -17,6 +17,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain
         public string SupportLocation { get; set; }
         public string SupportIndexInfo { get; set; }
         public bool SupportExist { get; set; }
+        public string? SourceCode { get; set; }
     }
 
     public enum SupportType
