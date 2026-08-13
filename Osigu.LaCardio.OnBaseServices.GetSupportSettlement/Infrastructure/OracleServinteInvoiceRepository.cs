@@ -35,14 +35,14 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                 c.CARVAL        AS amount,
                                 e.ENVFAECUF     AS invoice_electronic_code,
                                 p.EPIINAEPI     AS episode_number
-                            FROM SERVINTE.FAMOV h
-                            LEFT JOIN SERVINTE.CACAR c
+                            FROM FAMOV h
+                            LEFT JOIN CACAR c
                                 ON c.CARFUE = h.MOVFUE AND c.CARDOC = h.MOVDOC
-                            INNER JOIN SERVINTE.CAENC ca
+                            INNER JOIN CAENC ca
                                 ON ca.ENCFUE = h.MOVFUE AND ca.ENCDOC = h.MOVDOC AND ca.ENCSED = h.MOVEAD
-                            LEFT JOIN SERVINTE.FAENVFAE e
+                            LEFT JOIN FAENVFAE e
                                 ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD AND e.ENVFAEERR = 'N'
-                            LEFT JOIN SERVINTE.HIEPIINA p
+                            LEFT JOIN HIEPIINA p
                                 ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
                             WHERE e.ENVFAECUF IS NOT NULL AND h.MOVFUE = :fue AND h.MOVDOC = :doc
                         ";
