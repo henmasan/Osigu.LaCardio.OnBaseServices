@@ -4,6 +4,7 @@ using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Osigu.OnBaseServices.GetSupportSettlement.Model.Request;
@@ -67,6 +68,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     trace.ErrorMessage = "Maximum retry attempts exceeded";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogError($"Max retries exceeded for {trace.InvoiceNumber}");
+                    MoveSupportFileToFailed(trace.FilePath);
                     return;
                 }
 
@@ -129,6 +131,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     trace.LastAttemptTime = DateTime.UtcNow;
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogInformation($"Successfully sent {trace.SupportType} to RCM for invoice {trace.InvoiceNumber}, RcmId={response.RcmId}");
+                    DeleteLocalSupportFile(trace.FilePath);
                 }
                 else
                 {
@@ -227,6 +230,44 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             }).ToList().First();
 
             return groupedInvoicesInfo;
+        }
+
+        private void DeleteLocalSupportFile(string filePath)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                    _logger.LogInformation($"Archivo local eliminado tras envío exitoso: {filePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al eliminar archivo local {filePath}");
+            }
+        }
+
+        private void MoveSupportFileToFailed(string filePath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                {
+                    return;
+                }
+
+                var failedFolder = Path.Combine(Path.GetDirectoryName(filePath), "failed");
+                Directory.CreateDirectory(failedFolder);
+
+                var destination = Path.Combine(failedFolder, Path.GetFileName(filePath));
+                File.Move(filePath, destination, overwrite: true);
+                _logger.LogInformation($"Archivo movido a carpeta failed: {destination}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al mover archivo a carpeta failed {filePath}");
+            }
         }
 
     }
