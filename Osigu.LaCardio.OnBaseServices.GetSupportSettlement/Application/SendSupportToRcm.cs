@@ -86,15 +86,16 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 var groupedInvoicesInfo = SetGroupedInvoice(invoiceInfo);
 
                 var supportFileInfo = GetSupportFileCode(trace.SupportType);
+                var fullInvoiceNumber = $"{trace.SourceCode}{trace.InvoiceNumber}";
                 var supportFileMetadata = new SupportFileMetadata
                 {
                     ProcessId = trace.ProcessId,
                     DocumentType = supportFileInfo.RCMDoctypeName,
                     AgreementDate = string.Empty,
                     InvoiceAmount = groupedInvoicesInfo.Amount,
-                    InvoiceNumber = trace.InvoiceNumber,
+                    InvoiceNumber = fullInvoiceNumber,
                     InvoiceDateTime = groupedInvoicesInfo.InvoiceDate == DateTime.MinValue ? (DateTime?)null : groupedInvoicesInfo.InvoiceDate,
-                    DocumentTypeNumber = trace.InvoiceNumber,
+                    DocumentTypeNumber = fullInvoiceNumber,
                     InvoiceElectronicCode = groupedInvoicesInfo.InvoiceElectronicCode,
                     UniqueVerificationCode = trace.UniqueVerificationCode,
                     FilePath = trace.FilePath
