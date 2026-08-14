@@ -33,7 +33,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Workers
                 try
                 {
                     _logger.LogInformation("Processing RCM send queue...");
-                    await _sendSupportToRcm.ProcessQueueAsync();
+                   await _sendSupportToRcm.ProcessQueueAsync();
                 }
                 catch (Exception ex)
                 {

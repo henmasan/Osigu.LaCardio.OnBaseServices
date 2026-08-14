@@ -46,7 +46,15 @@ public class Program
                 services.AddSingleton<ISupportClassifier, SupportClassifier>();
 
                 services.AddSingleton<ISupportTraceStore, SqliteSupportTraceStore>();
-                services.AddSingleton<IServinteInvoiceRepository, OracleServinteInvoiceRepository>();
+
+                if (string.Equals(servinteSettings.DatabaseOrigin, "Informix", StringComparison.OrdinalIgnoreCase))
+                {
+                    services.AddSingleton<IServinteInvoiceRepository, InformixServinteInvoiceRepository>();
+                }
+                else
+                {
+                    services.AddSingleton<IServinteInvoiceRepository, OracleServinteInvoiceRepository>();
+                }
 
                 services.AddHttpClient<IRcmAuthClient, RcmAuthClient>();
                 services.AddHttpClient<IRcmSupportClient, RcmSupportClient>();
