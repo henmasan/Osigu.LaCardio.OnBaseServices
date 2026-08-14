@@ -4,6 +4,7 @@ using Oracle.ManagedDataAccess.Client;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 {
@@ -18,13 +19,15 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             _logger = logger;
         }
 
-        public async Task<ServinteInvoiceInfo> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode)
+        public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode)
         {
             try
             {
                 using (var connection = new OracleConnection(_servinteSettings.ConnectionString))
                 {
                     await connection.OpenAsync();
+
+                    List<ServinteInvoiceInfo> invoiceInfos = new List<ServinteInvoiceInfo>();
 
                     using (var command = connection.CreateCommand())
                     {
@@ -55,7 +58,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 
                         using (var reader = await command.ExecuteReaderAsync())
                         {
-                            if (await reader.ReadAsync())
+                            while (await reader.ReadAsync())
                             {
                                 var invoiceDate = reader.IsDBNull(0) ? DateTime.MinValue : reader.GetDateTime(0);
                                 var agreementCode = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
@@ -68,16 +71,18 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                     _logger.LogWarning($"Episode (EPIINAEPI) not found for invoice {invoiceNumber}");
                                 }
 
-                                return new ServinteInvoiceInfo
-                                {
-                                    InvoiceDate = invoiceDate,
-                                    Amount = amount,
-                                    AgreementCode = agreementCode,
-                                    InvoiceElectronicCode = invoiceElectronicCode,
-                                    OriginEventId = originEventId
-                                };
+                                ServinteInvoiceInfo invoiceInfo = new ServinteInvoiceInfo();
+
+                                invoiceInfo.InvoiceDate = invoiceDate;
+                                invoiceInfo.Amount = amount;
+                                invoiceInfo.AgreementCode = agreementCode;
+                                invoiceInfo.InvoiceElectronicCode = invoiceElectronicCode;
+                                invoiceInfo.OriginEventId = originEventId;
+
+                                invoiceInfos.Add(invoiceInfo);
                             }
                         }
+                        return invoiceInfos;
                     }
                 }
 

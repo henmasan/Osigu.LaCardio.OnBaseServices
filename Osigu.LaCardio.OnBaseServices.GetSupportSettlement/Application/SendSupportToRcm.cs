@@ -6,6 +6,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Osigu.OnBaseServices.GetSupportSettlement.Model.Request;
+using Osigu.OnBaseServices.GetSupportSettlement.Configuration;
+using System.Reflection.Metadata.Ecma335;
+using Osigu.OnBaseServices.GetSupportSettlement.Model.RCMRequest;
 
 namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 {
@@ -39,7 +43,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 
         public async Task SendPendingSupportAsync(SupportTraceRecord trace)
         {
-            ServinteInvoiceInfo invoiceInfo = null;
+            List<ServinteInvoiceInfo> invoiceInfo = null;
             try
             {
                 invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber, trace.SourceCode);
@@ -51,7 +55,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             await SendPendingSupportAsync(trace, invoiceInfo);
         }
 
-        private async Task SendPendingSupportAsync(SupportTraceRecord trace, ServinteInvoiceInfo invoiceInfo)
+        private async Task SendPendingSupportAsync(SupportTraceRecord trace, List<ServinteInvoiceInfo> invoiceInfo)
         {
             try
             {
@@ -78,25 +82,39 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 
                 var token = await _rcmAuthClient.GetTokenAsync();
 
-                var supportFileCode = GetSupportFileCode(trace.SupportType);
-                var uploadRequest = new RcmUploadRequest
+
+                var groupedInvoicesInfo = SetGroupedInvoice(invoiceInfo);
+
+                var supportFileInfo = GetSupportFileCode(trace.SupportType);
+                var supportFileMetadata = new SupportFileMetadata
                 {
-                    SupportFileCode = supportFileCode,
-                    AgreementCode = invoiceInfo.AgreementCode,
-                    OriginEventId = invoiceInfo.OriginEventId ?? string.Empty,
                     ProcessId = trace.ProcessId,
-                    DocumentType = supportFileCode,
+                    DocumentType = supportFileInfo.RCMDoctypeName,
                     AgreementDate = string.Empty,
-                    InvoiceAmount = invoiceInfo.Amount,
+                    InvoiceAmount = groupedInvoicesInfo.Amount,
                     InvoiceNumber = trace.InvoiceNumber,
-                    InvoiceDateTime = invoiceInfo.InvoiceDate == DateTime.MinValue ? (DateTime?)null : invoiceInfo.InvoiceDate,
+                    InvoiceDateTime = groupedInvoicesInfo.InvoiceDate == DateTime.MinValue ? (DateTime?)null : groupedInvoicesInfo.InvoiceDate,
                     DocumentTypeNumber = trace.InvoiceNumber,
-                    InvoiceElectronicCode = invoiceInfo.InvoiceElectronicCode,
+                    InvoiceElectronicCode = groupedInvoicesInfo.InvoiceElectronicCode,
                     UniqueVerificationCode = trace.UniqueVerificationCode,
                     FilePath = trace.FilePath
                 };
 
-                if (string.IsNullOrEmpty(invoiceInfo.OriginEventId))
+                var uploadRequest = new RequestData();
+                List<Event> events = new List<Event>();
+                events = groupedInvoicesInfo.InvoiceEvents.Select(e => new Event
+                {
+                    AgreementCode = e.AgreementCode,
+                    OriginEventId = e.OriginEventId ?? string.Empty
+                }).ToList();
+
+
+                uploadRequest.SupportFileCode = supportFileInfo.RCMDoctypeCode;
+                uploadRequest.Events = events;
+                uploadRequest.SupportFileMetadata = supportFileMetadata;
+
+
+                if (string.IsNullOrEmpty(groupedInvoicesInfo.InvoiceEvents.FirstOrDefault()?.OriginEventId))
                 {
                     _logger.LogWarning($"Origin event ID (episodio) not found for invoice {trace.InvoiceNumber}");
                 }
@@ -138,7 +156,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
 
             foreach (var group in groupedByInvoice)
             {
-                ServinteInvoiceInfo invoiceInfo = null;
+                List<ServinteInvoiceInfo> invoiceInfo = null;
                 try
                 {
                     invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(group.Key, group.First().SourceCode);
@@ -175,16 +193,40 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             await SendBatchAsync(pendingTraces);
         }
 
-        private string GetSupportFileCode(string supportType)
+        private SupportFileCodeMapping GetSupportFileCode(string supportType)
         {
+
             var mapping = _servinteSettings.SupportFileCodeMapping;
-            if (mapping?.ContainsKey(supportType) == true)
+            SupportFileCodeMapping supportInfo = new SupportFileCodeMapping();
+            supportInfo = mapping.FirstOrDefault(x => x.OnBaseDocType.Equals(supportType, StringComparison.OrdinalIgnoreCase));
+
+            if (supportInfo != null)
             {
-                return mapping[supportType];
+                return supportInfo;
             }
 
             _logger.LogWarning($"Support file code not found for type {supportType}, using default");
-            return supportType;
+            throw new Exception($"Support file code not found for type {supportType}");
         }
+
+        public GroupedServinteInvoiceInfo SetGroupedInvoice(List<ServinteInvoiceInfo> invoicesInfo)
+        {
+            var groupedInvoicesInfo = invoicesInfo
+            .GroupBy(i => new { i.Amount, i.InvoiceDate, i.InvoiceElectronicCode })
+            .Select(g => new GroupedServinteInvoiceInfo
+            {
+                Amount = g.Key.Amount,
+                InvoiceDate = g.Key.InvoiceDate,
+                InvoiceElectronicCode = g.Key.InvoiceElectronicCode,
+                InvoiceEvents = g.Select(e => new InvoiceEvent
+                {
+                    OriginEventId = e.OriginEventId,
+                    AgreementCode = e.AgreementCode
+                }).ToList()
+            }).ToList().First();
+
+            return groupedInvoicesInfo;
+        }
+
     }
 }

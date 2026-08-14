@@ -1,7 +1,10 @@
-using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
-using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
+using Osigu.OnBaseServices.GetSupportSettlement.Model.RCMResponse;
+using Osigu.OnBaseServices.GetSupportSettlement.Model.Request;
 using System;
 using System.IO;
 using System.Net.Http;
@@ -23,51 +26,43 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             _logger = logger;
         }
 
-        public async Task<RcmUploadResponse> UploadSupportAsync(RcmUploadRequest request, string accessToken)
+        public async Task<RCMUploadResponse> UploadSupportAsync(RequestData request, string accessToken)
         {
             try
             {
-                if (!File.Exists(request.FilePath))
+                if (!File.Exists(request.SupportFileMetadata.FilePath))
                 {
-                    _logger.LogError($"File not found: {request.FilePath}");
-                    return new RcmUploadResponse
-                    {
-                        Success = false,
-                        Message = "File not found"
-                    };
+                    _logger.LogError($"File not found: {request.SupportFileMetadata.FilePath}");
+                    //return new RCMUploadResponse
+                    //{
+                    //    Success = false,
+                    //    Message = "File not found"
+                    //};
                 }
 
                 var uploadUrl = $"{_rcmSettings.BaseUrl}{_rcmSettings.UploadPath}";
                 using (var multipartContent = new MultipartFormDataContent())
                 {
                     // Add file
-                    var fileBytes = File.ReadAllBytes(request.FilePath);
+                    var fileBytes = File.ReadAllBytes(request.SupportFileMetadata.FilePath);
                     var fileContent = new ByteArrayContent(fileBytes);
                     fileContent.Headers.Add("Content-Type", "application/octet-stream");
-                    multipartContent.Add(fileContent, "file", Path.GetFileName(request.FilePath));
+                    multipartContent.Add(fileContent, "file", Path.GetFileName(request.SupportFileMetadata.FilePath));
 
-                    // Build request_data JSON payload with nested structure
-                    var requestData = new
+                    var settings = new JsonSerializerSettings
                     {
-                        support_file_code = request.SupportFileCode,
-                        events = new[] { new { origin_event_id = request.OriginEventId, agreement_code = request.AgreementCode } },
-                        support_file_metadata = new
+                        ContractResolver = new DefaultContractResolver
                         {
-                            status = "OK",
-                            process_id = request.ProcessId,
-                            document_type = request.DocumentType,
-                            agreement_date = request.AgreementDate,
-                            invoice_amount = request.InvoiceAmount,
-                            invoice_number = request.InvoiceNumber,
-                            invoice_date_time = request.InvoiceDateTime,
-                            document_type_number = request.DocumentTypeNumber,
-                            invoice_electronic_code = request.InvoiceElectronicCode,
-                            unique_verification_code = request.UniqueVerificationCode
-                        },
-                        rutafisica = (string)null
+                            NamingStrategy = new SnakeCaseNamingStrategy()
+                        }
                     };
-                    var requestDataJson = JsonConvert.SerializeObject(requestData);
-                    multipartContent.Add(new StringContent(requestDataJson, Encoding.UTF8, "application/json"), "request_data");
+
+                    // Serializar
+                    string requestDataJson = JsonConvert.SerializeObject(request, settings);
+
+                    var jsonContent = new StringContent(requestDataJson, Encoding.UTF8, "application/json");
+                    multipartContent.Add(jsonContent, "request_data");
+
 
                     using (var httpRequest = new HttpRequestMessage(HttpMethod.Post, uploadUrl))
                     {
@@ -81,19 +76,30 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             if (!response.IsSuccessStatusCode)
                             {
                                 _logger.LogError($"RCM upload failed with status {response.StatusCode}: {responseContent}");
-                                return new RcmUploadResponse
+                                return new RCMUploadResponse
                                 {
                                     Success = false,
                                     Message = $"Upload failed: {response.StatusCode}"
                                 };
                             }
 
+                            if (response.StatusCode == System.Net.HttpStatusCode.NoContent || string.IsNullOrWhiteSpace(responseContent))
+                            {
+                                _logger.LogInformation($"RCM upload successful (HTTP {(int)response.StatusCode})");
+                                return new RCMUploadResponse
+                                {
+                                    Success = true,
+                                    Message = "File uploaded successfully",
+                                    RcmId = string.Empty
+                                };
+                            }
+
                             dynamic rcmResponse = JsonConvert.DeserializeObject(responseContent);
-                            return new RcmUploadResponse
+                            return new RCMUploadResponse
                             {
                                 Success = true,
                                 Message = "File uploaded successfully",
-                                RcmId = rcmResponse.id ?? rcmResponse.rcm_id ?? ""
+                                RcmId = rcmResponse?.id ?? rcmResponse?.rcm_id ?? ""
                             };
                         }
                     }
@@ -102,7 +108,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error uploading support to RCM");
-                return new RcmUploadResponse
+                return new RCMUploadResponse
                 {
                     Success = false,
                     Message = $"Upload error: {ex.Message}"
