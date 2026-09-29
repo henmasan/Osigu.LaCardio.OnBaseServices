@@ -1,8 +1,9 @@
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
+using IBM.Data.Db2;
 using System;
 using System.Collections.Generic;
-using System.Data.Odbc;
+using System.Data;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -19,11 +20,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             _logger = logger;
         }
 
-        public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode)
+        public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string eadCode)
         {
             try
             {
-                using (var connection = new OdbcConnection(_servinteSettings.InformixConnectionString))
+                using (var connection = new DB2Connection(_servinteSettings.InformixConnectionString))
                 {
                     await connection.OpenAsync();
 
@@ -32,7 +33,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = @"
-                            SELECT DISTINCT
+                            SELECT
+                                c.CARFUE        AS invoice_source,
                                 h.MOVFEC        AS invoice_date,
                                 h.MOVCER        AS agreement_code,
                                 c.CARVAL        AS amount,
@@ -41,30 +43,36 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             FROM FAMOV h
                             LEFT JOIN CACAR c
                                 ON c.CARFUE = h.MOVFUE AND c.CARDOC = h.MOVDOC
-                            INNER JOIN CAENC ca
+                            LEFT JOIN CAENC ca
                                 ON ca.ENCFUE = h.MOVFUE AND ca.ENCDOC = h.MOVDOC AND ca.ENCSED = h.MOVEAD
                             LEFT JOIN FAENVFAE e
                                 ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD AND e.ENVFAEERR = 'N'
                             LEFT JOIN HIEPIINA p
                                 ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
-                            WHERE e.ENVFAECUF IS NOT NULL AND h.MOVFUE = @fue AND h.MOVDOC = @doc
+                            WHERE h.MOVEAD = ? AND h.MOVDOC = ?
                         ";
 
-                        var fuente = new OdbcParameter("@fue", sourceCode);
-                        var documento = new OdbcParameter("@doc", Convert.ToInt32(invoiceNumber));
+                        var ead = command.CreateParameter();
+                        ead.ParameterName = "ead";
+                        ead.Value = eadCode;
 
-                        command.Parameters.Add(fuente);
+                        var documento = command.CreateParameter();
+                        documento.ParameterName = "doc";
+                        documento.Value = Convert.ToInt32(invoiceNumber);
+
+                        command.Parameters.Add(ead);
                         command.Parameters.Add(documento);
 
                         using (var reader = await command.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                var invoiceDate = reader.IsDBNull(0) ? DateTime.MinValue : reader.GetDateTime(0);
-                                var agreementCode = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-                                var amount = reader.IsDBNull(2) ? 0m : (decimal)reader.GetDouble(2);
-                                var invoiceElectronicCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
-                                var originEventId = reader.IsDBNull(4) ? string.Empty : reader.GetInt32(4).ToString();
+                                var invoiceSource = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                                var invoiceDate = reader.IsDBNull(1) ? DateTime.MinValue : reader.GetDateTime(1);
+                                var agreementCode = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+                                var amount = reader.IsDBNull(3) ? 0m : (decimal)reader.GetDecimal(3);
+                                var invoiceElectronicCode = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
+                                var originEventId = reader.IsDBNull(5) ? string.Empty : reader.GetInt32(5).ToString();
 
                                 if (string.IsNullOrEmpty(originEventId))
                                 {
@@ -73,6 +81,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 
                                 ServinteInvoiceInfo invoiceInfo = new ServinteInvoiceInfo();
 
+                                invoiceInfo.InvoiceSource = invoiceSource;
                                 invoiceInfo.InvoiceDate = invoiceDate;
                                 invoiceInfo.Amount = amount;
                                 invoiceInfo.AgreementCode = agreementCode;
@@ -85,9 +94,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                         return invoiceInfos;
                     }
                 }
-
-                _logger.LogWarning($"Invoice {invoiceNumber} not found in Informix Servinte");
-                return null;
             }
             catch (Exception ex)
             {
