@@ -12,20 +12,29 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Workers
     {
         private readonly ISendSupportToRcm _sendSupportToRcm;
         private readonly ServinteSettings _servinteSettings;
+        private readonly AppsettingConfiguration _appsetting;
         private readonly ILogger<SendSupportToRcmWorker> _logger;
 
         public SendSupportToRcmWorker(
             ISendSupportToRcm sendSupportToRcm,
             ServinteSettings servinteSettings,
+            AppsettingConfiguration appsetting,
             ILogger<SendSupportToRcmWorker> logger)
         {
             _sendSupportToRcm = sendSupportToRcm;
             _servinteSettings = servinteSettings;
+            _appsetting = appsetting;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (!_appsetting.Configuration.SendSupportToRcmWorkerEnabled)
+            {
+                _logger.LogInformation("SendSupportToRcmWorker is disabled by configuration");
+                return;
+            }
+
             _logger.LogInformation("SendSupportToRcmWorker started");
 
             while (!stoppingToken.IsCancellationRequested)

@@ -14,7 +14,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             Support support = new Support();
             string supportType = string.Empty;
             string code = string.Empty;
-            string sourceCode = string.Empty;
+            string eadCode = string.Empty;
 
             List<FileParameters> filterParameters = fileParameters
                 .Where(x => x.Extension == fileInfo.Extension)
@@ -35,7 +35,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                             {
                                 fileData = fileInfo.Name.Split(parameters.Separator);
                                 code = fileData[parameters.SectionInvoice - 1].Split('.')[0];
-                                sourceCode = code.Length >= 2 ? code.Substring(0, 2) : code;
+                                eadCode = code.Length >= 2 ? code.Substring(0, 2) : code;
                             }
                         }
                         break;
@@ -51,7 +51,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                             if (fileData.Length == parameters.SectionNumber)
                             {
                                 code = fileData[parameters.SectionInvoice - 1].Split('.')[0];
-                                sourceCode = code.Length >= 2 ? code.Substring(0, 2) : code;
+                                eadCode = code.Length >= 2 ? code.Substring(0, 2) : code;
                             }
                         }
                         break;
@@ -60,7 +60,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     {
                         fileData = fileInfo.Name.Split(parameters.Separator);
                         code = fileData[parameters.SectionInvoice - 1].Split('.')[0];
-                        sourceCode = code.Length >= 2 ? code.Substring(0, 2) : code;
+                        eadCode = code.Length >= 2 ? code.Substring(0, 2) : code;
                         break;
                     }
                 }
@@ -70,7 +70,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             {
                 support.SupportType = supportType;
                 support.SupportLocation = fileInfo.FullName;
-                support.SourceCode = sourceCode;
+                support.EadCode = eadCode;
 
                 if (fileInfo.Exists)
                 {

@@ -1,0 +1,26 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace ProcesadorSoportesMinisterio.Model
+{
+    public class SupportTraceRecord
+    {
+        public int Id { get; set; }
+        public string InvoiceNumber { get; set; }
+        public string SupportType { get; set; }
+        public int AttemptCount { get; set; }
+        public DateTime? LastAttemptTime { get; set; }
+        public string Status { get; set; }
+        public string ErrorMessage { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public string FilePath { get; set; }
+        public string ProcessId { get; set; }
+        public string UniqueVerificationCode { get; set; }
+        public string EadCode { get; set; }
+        public string Observation { get; set; }
+    }
+}

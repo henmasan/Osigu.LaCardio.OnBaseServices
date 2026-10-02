@@ -12,6 +12,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration
     }
     public class Configuration
     {
+        public bool GetSupportWorkerEnabled { get; set; }
+        public bool SendSupportToRcmWorkerEnabled { get; set; }
         public string ConnectionString { get; set; }
         public int ExecutionFrecuency { get; set; }
         public string SupportPath { get; set; }

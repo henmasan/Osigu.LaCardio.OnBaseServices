@@ -67,13 +67,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 
                     lock (_lockObject)
                     {
-                        _cachedToken = new RcmAuthToken
-                        {
-                            AccessToken = tokenResponse.access_token,
-                            ExpiresIn = tokenResponse.expires_in,
-                            TokenType = tokenResponse.token_type
-                        };
-
+                        _cachedToken = new RcmAuthToken();
+                        _cachedToken.AccessToken = tokenResponse.access_token;
+                        _cachedToken.ExpiresIn = _rcmSettings.TokenExpiration == 0 ? _cachedToken.ExpiresIn = tokenResponse.expires_in : _rcmSettings.TokenExpiration;
+                        _cachedToken.TokenType = tokenResponse.token_type;
+                       
                         _tokenExpiresAt = DateTime.UtcNow.AddSeconds(_cachedToken.ExpiresIn);
                     }
 

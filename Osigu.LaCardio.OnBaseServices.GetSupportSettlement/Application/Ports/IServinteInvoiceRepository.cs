@@ -6,11 +6,15 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports
 {
     public class ServinteInvoiceInfo
     {
+        public string InvoiceNumber { get; set; }
+        public string InvoiceSource { get; set; }
         public DateTime InvoiceDate { get; set; }
         public decimal Amount { get; set; }
         public string AgreementCode { get; set; }
         public string InvoiceElectronicCode { get; set; }
         public string OriginEventId { get; set; }
+
+        
     }
 
     public class GroupedServinteInvoiceInfo
@@ -29,6 +33,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports
 
     public interface IServinteInvoiceRepository
     {
-        Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode);
+        Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string eadCode);
     }
 }

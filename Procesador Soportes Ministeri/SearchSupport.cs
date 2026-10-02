@@ -9,6 +9,7 @@ using Ionic.Zip;
 using System.IO;
 using ProcesadorSoportesMinisterio.Model;
 using ProcesadorSoportesMinisterio.Util;
+using ProcesadorSoportesMinisterio.Rcm;
 
 namespace ProcesadorSoportesMinisterio
 {
@@ -17,12 +18,13 @@ namespace ProcesadorSoportesMinisterio
     {
         private readonly DataQueries _dataQueries;
         private Configuration _appsetting;
-        public SearchSupport(Configuration appsetting)
-        {
+        private ISupportTraceStore _traceStore;
 
+        public SearchSupport(Configuration appsetting, ISupportTraceStore traceStore = null)
+        {
             _appsetting = appsetting;
             _dataQueries = new DataQueries(appsetting);
-
+            _traceStore = traceStore;
         }
 
         public async Task FindSupportInFolder()
@@ -148,24 +150,90 @@ namespace ProcesadorSoportesMinisterio
         public async Task MoveFiles(List<Support> supports, string InvoiceNumber)
         {
             string destinationPath = _appsetting.DestinationData.DetinationPath;
+            string rcmStagingPath = _appsetting.RcmStagingPath;
 
             try
             {
                 foreach (var support in supports)
                 {
-
+                    // 1. Append to OnBase index file
                     using (StreamWriter writer = new StreamWriter($@"{destinationPath}\Support{InvoiceNumber}.txt", true))
                     {
                         writer.WriteLine(support.SupportIndexInfo);
                     }
+
                     FileInfo fileInfo = new FileInfo(support.SupportLocation);
 
-                    File.Move(support.SupportLocation, $"{destinationPath}/{fileInfo.Name}");
+                    // 2. Copy to OnBase destination
+                    File.Copy(support.SupportLocation, $"{destinationPath}/{fileInfo.Name}", true);
+
+                    // 3. Move to RCM staging
+                    if (!string.IsNullOrEmpty(rcmStagingPath))
+                    {
+                        if (!Directory.Exists(rcmStagingPath))
+                        {
+                            Directory.CreateDirectory(rcmStagingPath);
+                        }
+
+                        string rcmFilePath = Path.Combine(rcmStagingPath, fileInfo.Name);
+                        File.Move(support.SupportLocation, rcmFilePath, true);
+
+                        // 4. Extract EAD code from the index info (last part before |)
+                        var indexParts = support.SupportIndexInfo.Split('|');
+                        string eadCode = indexParts.Length >= 4 ? indexParts[3] : "";
+
+                        // 5. Register trace in SQLite if store is available
+                        if (_traceStore != null)
+                        {
+                            var trace = new SupportTraceRecord
+                            {
+                                InvoiceNumber = InvoiceNumber,
+                                SupportType = support.SupportType,
+                                Status = "Pending",
+                                AttemptCount = 0,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow,
+                                FilePath = rcmFilePath,
+                                EadCode = eadCode,
+                                ProcessId = null,
+                                UniqueVerificationCode = null
+                            };
+
+                            // For CUV files, extract process ID and unique verification code
+                            if (support.SupportType.ToLower().Contains("cuv") && !support.SupportType.ToLower().Contains("text"))
+                            {
+                                try
+                                {
+                                    var cuvData = JsonConvert.DeserializeObject<dynamic>(File.ReadAllText(rcmFilePath));
+                                    trace.ProcessId = cuvData?.process_id?.ToString() ?? cuvData?.ProcesoId?.ToString();
+                                    trace.UniqueVerificationCode = cuvData?.unique_verification_code?.ToString() ?? cuvData?.CodigoUnicoValidacion?.ToString();
+                                }
+                                catch
+                                {
+                                    // Log warning but continue
+                                }
+                            }
+
+                            try
+                            {
+                                await _traceStore.AddTraceAsync(trace);
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log error but don't fail the whole process
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: move to destination if no staging path
+                        File.Move(support.SupportLocation, $"{destinationPath}/{fileInfo.Name}", true);
+                    }
                 }
             }
             catch (Exception ex)
             {
-
+                // Log error but allow the folder to be deleted
             }
 
         }

@@ -9,6 +9,8 @@ namespace ProcesadorSoportesMinisterio.Model
     public class AppsettingConfiguration
     {
         public Configuration Configuration { get; set; }
+        public RcmApiSettings RcmApi { get; set; }
+        public ServinteSettings Servinte { get; set; }
     }
     public class Configuration
     {
@@ -18,6 +20,8 @@ namespace ProcesadorSoportesMinisterio.Model
         public char PrefixSeparator { get; set; }
         public List<FileParameters> FileParameters { get; set; }
         public DestinationData DestinationData { get; set; }
+        public string RcmStagingPath { get; set; }
+        public bool SendSupportToRcmEnabled { get; set; }
 
     }
 

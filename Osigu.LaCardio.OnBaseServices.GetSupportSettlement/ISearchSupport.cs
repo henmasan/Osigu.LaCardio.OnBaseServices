@@ -10,7 +10,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
     public interface ISearchSupport
     {
         Task FindSupportInFolder();
-        Task FindPendingInvoice();
+        //Task FindPendingInvoice();
         Task<ProcessData> FindSupports(Invoice invoice);
     }
 }

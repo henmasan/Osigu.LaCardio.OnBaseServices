@@ -8,6 +8,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration
         public string AuthPath { get; set; }
         public string UploadPath { get; set; }
         public int Retries { get; set; }
-        public int DelayBetweenRetriesMs { get; set; }
+        public int MaxConcurrentUploads { get; set; }
+        public int TokenExpiration { get; set; }
+
     }
 }

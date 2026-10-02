@@ -30,6 +30,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     connection.Open();
                     using (var command = connection.CreateCommand())
                     {
+                        command.CommandText = "PRAGMA journal_mode=WAL";
+                        command.ExecuteNonQuery();
+                    }
+                    using (var command = connection.CreateCommand())
+                    {
                         command.CommandText = @"
                             CREATE TABLE IF NOT EXISTS SupportTrace (
                                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,7 +49,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                 FilePath TEXT,
                                 ProcessId TEXT,
                                 UniqueVerificationCode TEXT,
-                                SourceCode TEXT
+                                SourceCode TEXT,
+                                Observation TEXT
                             );
 
                             CREATE INDEX IF NOT EXISTS idx_invoice_support
@@ -80,6 +86,12 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                             command.CommandText = "ALTER TABLE SupportTrace ADD COLUMN SourceCode TEXT";
                             command.ExecuteNonQuery();
                         }
+
+                        if (!columns.Contains("Observation"))
+                        {
+                            command.CommandText = "ALTER TABLE SupportTrace ADD COLUMN Observation TEXT";
+                            command.ExecuteNonQuery();
+                        }
                     }
                 }
                 _logger.LogInformation($"SQLite database initialized at {_databasePath}");
@@ -99,9 +111,14 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     await connection.OpenAsync();
                     using (var command = connection.CreateCommand())
                     {
+                        command.CommandText = "PRAGMA busy_timeout=5000";
+                        command.ExecuteNonQuery();
+                    }
+                    using (var command = connection.CreateCommand())
+                    {
                         command.CommandText = @"
-                            INSERT INTO SupportTrace (InvoiceNumber, SupportType, AttemptCount, Status, FilePath, ProcessId, UniqueVerificationCode, SourceCode)
-                            VALUES (@invoice, @supportType, @attempts, @status, @filePath, @processId, @uniqueVerificationCode, @sourceCode);
+                            INSERT INTO SupportTrace (InvoiceNumber, SupportType, AttemptCount, Status, FilePath, ProcessId, UniqueVerificationCode, SourceCode, Observation)
+                            VALUES (@invoice, @supportType, @attempts, @status, @filePath, @processId, @uniqueVerificationCode, @sourceCode, @observation);
                             SELECT last_insert_rowid();
                         ";
                         command.Parameters.AddWithValue("@invoice", record.InvoiceNumber ?? "");
@@ -111,7 +128,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                         command.Parameters.AddWithValue("@filePath", record.FilePath ?? "");
                         command.Parameters.AddWithValue("@processId", (object?)record.ProcessId ?? DBNull.Value);
                         command.Parameters.AddWithValue("@uniqueVerificationCode", (object?)record.UniqueVerificationCode ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@sourceCode", (object?)record.SourceCode ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@sourceCode", (object?)record.EadCode ?? DBNull.Value);
+                        command.Parameters.AddWithValue("@observation", (object?)record.Observation ?? DBNull.Value);
 
                         var id = (long?)await command.ExecuteScalarAsync() ?? 0;
                         record.Id = (int)id;
@@ -134,6 +152,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
                 {
                     await connection.OpenAsync();
+                    using (var pragmaCommand = connection.CreateCommand())
+                    {
+                        pragmaCommand.CommandText = "PRAGMA busy_timeout=5000";
+                        pragmaCommand.ExecuteNonQuery();
+                    }
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = "SELECT * FROM SupportTrace WHERE Id = @id";
@@ -163,6 +186,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
                 {
                     await connection.OpenAsync();
+                    using (var pragmaCommand = connection.CreateCommand())
+                    {
+                        pragmaCommand.CommandText = "PRAGMA busy_timeout=5000";
+                        pragmaCommand.ExecuteNonQuery();
+                    }
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = "SELECT * FROM SupportTrace WHERE InvoiceNumber = @invoice AND SupportType = @supportType AND Status = 'Pending'";
@@ -194,6 +222,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
                 {
                     await connection.OpenAsync();
+                    using (var pragmaCommand = connection.CreateCommand())
+                    {
+                        pragmaCommand.CommandText = "PRAGMA busy_timeout=5000";
+                        pragmaCommand.ExecuteNonQuery();
+                    }
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = "SELECT * FROM SupportTrace WHERE Status = 'Pending' ORDER BY CreatedAt ASC";
@@ -222,18 +255,24 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
                 {
                     await connection.OpenAsync();
+                    using (var pragmaCommand = connection.CreateCommand())
+                    {
+                        pragmaCommand.CommandText = "PRAGMA busy_timeout=5000";
+                        pragmaCommand.ExecuteNonQuery();
+                    }
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = @"
                             UPDATE SupportTrace
                             SET AttemptCount = @attempts, Status = @status, ErrorMessage = @error,
-                                LastAttemptTime = @lastAttempt, UpdatedAt = CURRENT_TIMESTAMP
+                                LastAttemptTime = @lastAttempt, Observation = @observation, UpdatedAt = CURRENT_TIMESTAMP
                             WHERE Id = @id
                         ";
                         command.Parameters.AddWithValue("@attempts", record.AttemptCount);
                         command.Parameters.AddWithValue("@status", record.Status ?? "Pending");
                         command.Parameters.AddWithValue("@error", record.ErrorMessage ?? "");
                         command.Parameters.AddWithValue("@lastAttempt", record.LastAttemptTime == DateTime.MinValue ? DBNull.Value : record.LastAttemptTime);
+                        command.Parameters.AddWithValue("@observation", (object?)record.Observation ?? DBNull.Value);
                         command.Parameters.AddWithValue("@id", record.Id);
 
                         await command.ExecuteNonQueryAsync();
@@ -253,6 +292,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
                 {
                     await connection.OpenAsync();
+                    using (var pragmaCommand = connection.CreateCommand())
+                    {
+                        pragmaCommand.CommandText = "PRAGMA busy_timeout=5000";
+                        pragmaCommand.ExecuteNonQuery();
+                    }
                     using (var command = connection.CreateCommand())
                     {
                         command.CommandText = "SELECT COUNT(*) FROM SupportTrace WHERE InvoiceNumber = @invoice AND SupportType = @supportType";
@@ -287,7 +331,8 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 FilePath = reader.IsDBNull(9) ? null : reader.GetString(9),
                 ProcessId = reader.FieldCount > 10 && !reader.IsDBNull(10) ? reader.GetString(10) : null,
                 UniqueVerificationCode = reader.FieldCount > 11 && !reader.IsDBNull(11) ? reader.GetString(11) : null,
-                SourceCode = reader.FieldCount > 12 && !reader.IsDBNull(12) ? reader.GetString(12) : null
+                EadCode = reader.FieldCount > 12 && !reader.IsDBNull(12) ? reader.GetString(12) : null,
+                Observation = reader.FieldCount > 13 && !reader.IsDBNull(13) ? reader.GetString(13) : null
             };
         }
     }

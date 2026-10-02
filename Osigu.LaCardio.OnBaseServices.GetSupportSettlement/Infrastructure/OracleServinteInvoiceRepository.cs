@@ -19,7 +19,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
             _logger = logger;
         }
 
-        public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string sourceCode)
+        public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string eadCode)
         {
             try
             {
@@ -33,6 +33,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                     {
                         command.CommandText = @"
                             SELECT DISTINCT
+                                c.CARFUE        AS invoice_source,
                                 h.MOVFEC        AS invoice_date,
                                 h.MOVCER        AS agreement_code,
                                 c.CARVAL        AS amount,
@@ -47,24 +48,25 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                                 ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD AND e.ENVFAEERR = 'N'
                             LEFT JOIN HIEPIINA p
                                 ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
-                            WHERE e.ENVFAECUF IS NOT NULL AND h.MOVFUE = :fue AND h.MOVDOC = :doc
+                            WHERE e.ENVFAECUF IS NOT NULL AND h.MOVEAD = :ead AND h.MOVDOC = :doc
                         ";
 
-                        var fuente = new OracleParameter(":fue", sourceCode);
+                        var ead = new OracleParameter(":ead", eadCode);
                         var documento = new OracleParameter(":doc", Convert.ToInt32(invoiceNumber));
 
-                        command.Parameters.Add(fuente);
+                        command.Parameters.Add(ead);
                         command.Parameters.Add(documento);
 
                         using (var reader = await command.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                var invoiceDate = reader.IsDBNull(0) ? DateTime.MinValue : reader.GetDateTime(0);
-                                var agreementCode = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
-                                var amount = reader.IsDBNull(2) ? 0m : (decimal)reader.GetDouble(2);
-                                var invoiceElectronicCode = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
-                                var originEventId = reader.IsDBNull(4) ? string.Empty : reader.GetInt32(4).ToString();
+                                var invoiceSource = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                                var invoiceDate = reader.IsDBNull(1) ? DateTime.MinValue : reader.GetDateTime(1);
+                                var agreementCode = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+                                var amount = reader.IsDBNull(3) ? 0m : (decimal)reader.GetDouble(3);
+                                var invoiceElectronicCode = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
+                                var originEventId = reader.IsDBNull(5) ? string.Empty : reader.GetInt32(5).ToString();
 
                                 if (string.IsNullOrEmpty(originEventId))
                                 {
@@ -73,6 +75,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 
                                 ServinteInvoiceInfo invoiceInfo = new ServinteInvoiceInfo();
 
+                                invoiceInfo.InvoiceSource = invoiceSource;
                                 invoiceInfo.InvoiceDate = invoiceDate;
                                 invoiceInfo.Amount = amount;
                                 invoiceInfo.AgreementCode = agreementCode;

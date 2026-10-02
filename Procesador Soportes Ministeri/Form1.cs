@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using ProcesadorSoportesMinisterio.Model;
+using ProcesadorSoportesMinisterio.Rcm;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,25 +17,39 @@ namespace ProcesadorSoportesMinisterio
     public partial class Form1 : Form
     {
         private Timer _timer;
+        private Timer _rcmTimer;
         private string Estado;
+        private AppsettingConfiguration _appSettings;
+        private ISupportTraceStore _traceStore;
+        private ISendSupportToRcm _sendSupportToRcm;
+        private bool _rcmProcessing = false;
+
         public Form1()
         {
             InitializeComponent();
 
             _timer = new Timer();
-            _timer.Interval = Convert.ToInt32(txtTime.Text) * 60000 ; 
-            _timer.Tick += OnTimedEvent; 
+            _timer.Interval = Convert.ToInt32(txtTime.Text) * 60000 ;
+            _timer.Tick += OnTimedEvent;
+
+            _rcmTimer = new Timer();
+            _rcmTimer.Tick += OnRcmTimerTick;
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            
+
             if (string.IsNullOrEmpty(Estado))
             {
                 Estado = "Iniciado";
                 txtTime.ReadOnly=true;
                 btnProceso.Text = "Detener";
+                InitializeRcmServices();
                 _timer.Start();
+                if (_appSettings?.SendSupportToRcmEnabled == true)
+                {
+                    _rcmTimer.Start();
+                }
             }
             else if(Estado == "Iniciado")
             {
@@ -42,6 +57,7 @@ namespace ProcesadorSoportesMinisterio
                 txtTime.ReadOnly = false;
                 btnProceso.Text = "Iniciar";
                 _timer.Stop();
+                _rcmTimer.Stop();
             }
 
             else if (Estado == "Detenido")
@@ -50,6 +66,10 @@ namespace ProcesadorSoportesMinisterio
                 txtTime.ReadOnly = true;
                 btnProceso.Text = "Detener";
                 _timer.Start();
+                if (_appSettings?.SendSupportToRcmEnabled == true)
+                {
+                    _rcmTimer.Start();
+                }
             }
             ProcessSupport();
         }
@@ -58,32 +78,125 @@ namespace ProcesadorSoportesMinisterio
             ProcessSupport();
         }
 
+        private void InitializeRcmServices()
+        {
+            try
+            {
+                if (_appSettings == null)
+                {
+                    string path = GetAppsettingsPath();
+                    _appSettings = LoadAppSettings(path);
+                }
+
+                if (_appSettings?.SendSupportToRcmEnabled == true && _appSettings?.RcmApi != null && _appSettings?.Servinte != null)
+                {
+                    string rcmStagingPath = _appSettings.Configuration?.RcmStagingPath;
+                    if (string.IsNullOrEmpty(rcmStagingPath))
+                    {
+                        throw new Exception("RcmStagingPath is not configured");
+                    }
+
+                    _traceStore = new SqliteSupportTraceStore(Path.Combine(rcmStagingPath, "support_trace.db"));
+
+                    IServinteInvoiceRepository servinteRepository;
+                    if (_appSettings.Servinte?.DatabaseOrigin?.Equals("Informix", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        servinteRepository = new InformixServinteInvoiceRepository(_appSettings.Servinte.InformixConnectionString);
+                    }
+                    else
+                    {
+                        servinteRepository = new OracleServinteInvoiceRepository(_appSettings.Servinte.ConnectionString);
+                    }
+
+                    var rcmAuthClient = new RcmAuthClient(_appSettings.RcmApi);
+                    var rcmSupportClient = new RcmSupportClient(_appSettings.RcmApi);
+
+                    _sendSupportToRcm = new SendSupportToRcm(
+                        _traceStore,
+                        servinteRepository,
+                        rcmAuthClient,
+                        rcmSupportClient,
+                        _appSettings.RcmApi,
+                        _appSettings.Servinte,
+                        rcmStagingPath
+                    );
+
+                    int rcmFrequency = _appSettings.Servinte?.RcmSendExecutionFrequency ?? 60000;
+                    if (rcmFrequency <= 0) rcmFrequency = 60000;
+                    _rcmTimer.Interval = rcmFrequency;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error initializing RCM services: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void OnRcmTimerTick(object sender, EventArgs e)
+        {
+            if (_rcmProcessing || _sendSupportToRcm == null)
+            {
+                return;
+            }
+
+            _rcmProcessing = true;
+            try
+            {
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _sendSupportToRcm.ProcessQueueAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log error
+                    }
+                    finally
+                    {
+                        _rcmProcessing = false;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _rcmProcessing = false;
+                // Log error
+            }
+        }
+
+        private string GetAppsettingsPath()
+        {
+            return string.Format($"{System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetModules()[0].FullyQualifiedName)}\\appsettings.json");
+        }
+
+        private AppsettingConfiguration LoadAppSettings(string path)
+        {
+            StringBuilder contentFile = new StringBuilder();
+            using (StreamReader sr = new StreamReader(path))
+            {
+                string line = string.Empty;
+                while ((line = sr.ReadLine()) != null)
+                {
+                    contentFile.AppendLine(line);
+                }
+            }
+
+            string docJson = contentFile.ToString();
+            return JsonConvert.DeserializeObject<AppsettingConfiguration>(docJson);
+        }
+
         public void ProcessSupport()
         {
             try
             {
-
-                string path = string.Format($"{System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetModules()[0].FullyQualifiedName)}\\appsettings.json");
-
-                StringBuilder contentFile = new StringBuilder();
-                using (StreamReader sr = new StreamReader(path))
+                if (_appSettings == null)
                 {
-                    string line = string.Empty;
-                    while ((line = sr.ReadLine()) != null)
-                    {
-                        contentFile.AppendLine(line);
-                    }
-
+                    string path = GetAppsettingsPath();
+                    _appSettings = LoadAppSettings(path);
                 }
 
-                Configuration configuration = new Configuration();
-
-                string docJson = contentFile.ToString();
-
-                var appSetting = JsonConvert.DeserializeObject<AppsettingConfiguration>(docJson);
-
-
-                SearchSupport searchSupport = new SearchSupport(appSetting.Configuration);
+                SearchSupport searchSupport = new SearchSupport(_appSettings.Configuration, _traceStore);
                 searchSupport.FindSupportInFolder();
             }
             catch (Exception ex)

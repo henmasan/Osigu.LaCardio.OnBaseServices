@@ -46,62 +46,62 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             ProcessData processData = await MappingFiles(DirectoryList);
 
         }
-            public async Task FindPendingInvoice()
-        {
-            List<Invoice> invoices = new List<Invoice>();
-            List<ProcessData> processDataList = new List<ProcessData>();
+        //    public async Task FindPendingInvoice()
+        //{
+        //    List<Invoice> invoices = new List<Invoice>();
+        //    List<ProcessData> processDataList = new List<ProcessData>();
 
-            invoices = await _dataQueries.GetPendingInvoices("Pending");
+        //    invoices = await _dataQueries.GetPendingInvoices("Pending");
 
-            if (invoices.Count > 0)
-            {
+        //    if (invoices.Count > 0)
+        //    {
 
-                var jsonSerializerSettings = new JsonSerializerSettings
-                {
-                    ContractResolver = new LowerCaseContractResolver(),
-                    NullValueHandling = NullValueHandling.Ignore
+        //        var jsonSerializerSettings = new JsonSerializerSettings
+        //        {
+        //            ContractResolver = new LowerCaseContractResolver(),
+        //            NullValueHandling = NullValueHandling.Ignore
 
-                };
+        //        };
 
-                foreach (Invoice invoice in invoices)
-                {
-                    ProcessData processData = null;
-                    processData = await FindSupports(invoice);
+        //        foreach (Invoice invoice in invoices)
+        //        {
+        //            ProcessData processData = null;
+        //            processData = await FindSupports(invoice);
 
-                    if (processData != null)
-                    {
-                        processDataList.Add(processData);
-                    }
+        //            if (processData != null)
+        //            {
+        //                processDataList.Add(processData);
+        //            }
 
-                    if (processDataList.Count > 0)
-                    {
-                        foreach (var process in processDataList)
-                        {
-                            if (process.Support.Count > 0)
-                            {
-                                bool completed = process.Support.Where(x => x.SupportExist == false).Count() > 0 ? false : true;
-                                if (!completed)
-                                {
-                                    process.Completed = false;
-                                    invoice.Status = "Pending";
-                                    break;
-                                }
-                                else
-                                {
-                                    process.Completed = true;
-                                    invoice.Status = "Completed";
-                                    string jsonBody = JsonConvert.SerializeObject(process, jsonSerializerSettings);
-                                    invoice.ProcessData = jsonBody;
-                                }
-                            }
+        //            if (processDataList.Count > 0)
+        //            {
+        //                foreach (var process in processDataList)
+        //                {
+        //                    if (process.Support.Count > 0)
+        //                    {
+        //                        bool completed = process.Support.Where(x => x.SupportExist == false).Count() > 0 ? false : true;
+        //                        if (!completed)
+        //                        {
+        //                            process.Completed = false;
+        //                            invoice.Status = "Pending";
+        //                            break;
+        //                        }
+        //                        else
+        //                        {
+        //                            process.Completed = true;
+        //                            invoice.Status = "Completed";
+        //                            string jsonBody = JsonConvert.SerializeObject(process, jsonSerializerSettings);
+        //                            invoice.ProcessData = jsonBody;
+        //                        }
+        //                    }
 
-                        }
-                    }
-                    _dataQueries.UpdateInvoice(invoice);
-                }
+        //                }
+        //            }
+        //            _dataQueries.UpdateInvoice(invoice);
+        //        }
 
-            }
-        }
+        //    }
+        //}
 
 
 
@@ -148,7 +148,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                             {
                                 Support cuvTextSupport = new Support();
                                 cuvTextSupport.SupportType = $"{support.SupportType}-TEXT";
-                                cuvTextSupport.SourceCode = support.SourceCode;
+                                cuvTextSupport.EadCode = support.EadCode;
                                 string fileName = Path.GetFileNameWithoutExtension(fileInfo.FullName);
                                 string newFileName = $@"{fileInfo.DirectoryName}\{fileName}.txt";
                                 File.Copy(fileInfo.FullName, newFileName, true);

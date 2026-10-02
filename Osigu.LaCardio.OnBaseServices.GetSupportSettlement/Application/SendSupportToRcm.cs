@@ -3,9 +3,11 @@ using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Domain;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Osigu.OnBaseServices.GetSupportSettlement.Model.Request;
 using Osigu.OnBaseServices.GetSupportSettlement.Configuration;
@@ -47,7 +49,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             List<ServinteInvoiceInfo> invoiceInfo = null;
             try
             {
-                invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber, trace.SourceCode);
+                invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber, trace.EadCode);
             }
             catch (Exception ex)
             {
@@ -66,6 +68,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 {
                     trace.Status = "Failed";
                     trace.ErrorMessage = "Maximum retry attempts exceeded";
+                    trace.Observation = $"Falló: Se excedió el número máximo de reintentos ({_rcmSettings.Retries}). Última observación: {trace.ErrorMessage}";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogError($"Max retries exceeded for {trace.InvoiceNumber}");
                     MoveSupportFileToFailed(trace.FilePath);
@@ -77,6 +80,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     trace.AttemptCount++;
                     trace.LastAttemptTime = DateTime.UtcNow;
                     trace.ErrorMessage = "Invoice not found in Servinte";
+                    trace.Observation = $"Intento {trace.AttemptCount}: No se encontró la factura {trace.InvoiceNumber} en Servinte";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogWarning($"Invoice {trace.InvoiceNumber} not found in Servinte");
                     return;
@@ -88,7 +92,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 var groupedInvoicesInfo = SetGroupedInvoice(invoiceInfo);
 
                 var supportFileInfo = GetSupportFileCode(trace.SupportType);
-                var fullInvoiceNumber = $"{trace.SourceCode}{trace.InvoiceNumber}";
+                var fullInvoiceNumber = $"{trace.EadCode}{trace.InvoiceNumber}";
                 var supportFileMetadata = new SupportFileMetadata
                 {
                     ProcessId = trace.ProcessId,
@@ -129,6 +133,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     trace.Status = "Success";
                     trace.ErrorMessage = null;
                     trace.LastAttemptTime = DateTime.UtcNow;
+                    trace.Observation = $"Exitoso: Soporte enviado a RCM. RcmId={response.RcmId}";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogInformation($"Successfully sent {trace.SupportType} to RCM for invoice {trace.InvoiceNumber}, RcmId={response.RcmId}");
                     DeleteLocalSupportFile(trace.FilePath);
@@ -138,6 +143,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     trace.AttemptCount++;
                     trace.LastAttemptTime = DateTime.UtcNow;
                     trace.ErrorMessage = response.Message;
+                    trace.Observation = $"Intento {trace.AttemptCount}: Fallo en RCM - {response.Message}";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogWarning($"Failed to send {trace.SupportType} to RCM: {response.Message}");
                 }
@@ -147,6 +153,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 trace.AttemptCount++;
                 trace.LastAttemptTime = DateTime.UtcNow;
                 trace.ErrorMessage = $"Error: {ex.Message}";
+                trace.Observation = $"Intento {trace.AttemptCount}: Excepción - {ex.GetType().Name}: {ex.Message}";
                 await _traceStore.UpdateTraceAsync(trace);
                 _logger.LogError(ex, $"Error sending support to RCM for invoice {trace.InvoiceNumber}");
             }
@@ -156,32 +163,60 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
         {
             _logger.LogInformation($"Processing batch of {traces.Count} pending traces");
 
-            var groupedByInvoice = traces.GroupBy(t => t.InvoiceNumber);
+            var invoiceInfoCache = new ConcurrentDictionary<string, Lazy<Task<List<ServinteInvoiceInfo>>>>();
+            using var semaphore = new SemaphoreSlim(_rcmSettings.MaxConcurrentUploads);
 
-            foreach (var group in groupedByInvoice)
+            var pendingTasks = new List<Task>();
+            foreach (var trace in traces)
             {
-                List<ServinteInvoiceInfo> invoiceInfo = null;
-                try
-                {
-                    invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(group.Key, group.First().SourceCode);
-                    if (invoiceInfo != null)
-                    {
-                        _logger.LogInformation($"Retrieved invoice info for {group.Key} (processing {group.Count()} support(s))");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error retrieving invoice {group.Key} from Servinte");
-                }
-
-                foreach (var trace in group)
-                {
-                    await SendPendingSupportAsync(trace, invoiceInfo);
-                    await Task.Delay(_rcmSettings.DelayBetweenRetriesMs);
-                }
+                pendingTasks.Add(SendTraceWithConcurrencyLimitAsync(trace, invoiceInfoCache, semaphore));
             }
 
+            await Task.WhenAll(pendingTasks);
+
             _logger.LogInformation("Batch processing completed");
+        }
+
+        private async Task SendTraceWithConcurrencyLimitAsync(
+            SupportTraceRecord trace,
+            ConcurrentDictionary<string, Lazy<Task<List<ServinteInvoiceInfo>>>> invoiceInfoCache,
+            SemaphoreSlim semaphore)
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                var lazyInvoiceInfo = invoiceInfoCache.GetOrAdd(trace.InvoiceNumber, CreateLazyInvoiceInfoQuery, trace.EadCode);
+                var invoiceInfo = await lazyInvoiceInfo.Value;
+                await SendPendingSupportAsync(trace, invoiceInfo);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        private Lazy<Task<List<ServinteInvoiceInfo>>> CreateLazyInvoiceInfoQuery(string invoiceNumber, string sourceCode)
+        {
+            Task<List<ServinteInvoiceInfo>> FetchInvoiceInfo() => GetInvoiceInfoSafeAsync(invoiceNumber, sourceCode);
+            return new Lazy<Task<List<ServinteInvoiceInfo>>>(FetchInvoiceInfo);
+        }
+
+        private async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoSafeAsync(string invoiceNumber, string sourceCode)
+        {
+            try
+            {
+                var invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(invoiceNumber, sourceCode);
+                if (invoiceInfo != null)
+                {
+                    _logger.LogInformation($"Retrieved invoice info for {invoiceNumber}");
+                }
+                return invoiceInfo;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving invoice {invoiceNumber} from Servinte");
+                return null;
+            }
         }
 
         public async Task ProcessQueueAsync()

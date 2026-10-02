@@ -61,7 +61,7 @@ public class Program
 
                 services.AddSingleton<ISendSupportToRcm, SendSupportToRcm>();
 
-                //services.AddHostedService<GetSupportWorker>();
+                services.AddHostedService<GetSupportWorker>();
                 services.AddHostedService<SendSupportToRcmWorker>();
 
                 services.AddLogging(builder => builder.AddSerilog(

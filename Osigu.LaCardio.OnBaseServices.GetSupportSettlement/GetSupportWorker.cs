@@ -23,6 +23,12 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Workers
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (!_appsetting.Configuration.GetSupportWorkerEnabled)
+            {
+                _logger.LogInformation("GetSupportWorker is disabled by configuration");
+                return;
+            }
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 await _searchSupport.FindSupportInFolder();
