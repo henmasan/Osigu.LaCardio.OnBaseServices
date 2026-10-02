@@ -183,10 +183,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
                     RutaFisica = null
                 };
 
-                // Store the file path in metadata temporarily for upload
-                requestData.SupportFileMetadata.InvoiceNumber = trace.FilePath;
-
-                var uploadResult = await _rcmSupportClient.UploadSupportAsync(requestData, token.AccessToken);
+                var uploadResult = await _rcmSupportClient.UploadSupportAsync(requestData, token.AccessToken, trace.FilePath);
 
                 if (uploadResult.Success)
                 {

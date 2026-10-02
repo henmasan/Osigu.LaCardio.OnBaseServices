@@ -14,7 +14,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
 {
     public interface IRcmSupportClient
     {
-        Task<RcmUploadResult> UploadSupportAsync(RequestData request, string accessToken);
+        Task<RcmUploadResult> UploadSupportAsync(RequestData request, string accessToken, string filePath);
     }
 
     public class RcmUploadResult
@@ -34,18 +34,17 @@ namespace ProcesadorSoportesMinisterio.Rcm
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
-        public async Task<RcmUploadResult> UploadSupportAsync(RequestData request, string accessToken)
+        public async Task<RcmUploadResult> UploadSupportAsync(RequestData request, string accessToken, string filePath)
         {
             try
             {
-                var filePath = request.SupportFileMetadata.InvoiceNumber;
-                if (!File.Exists(request.SupportFileMetadata.InvoiceNumber))
+                if (!File.Exists(filePath))
                 {
                     return new RcmUploadResult { Success = false, ErrorMessage = $"File not found: {filePath}" };
                 }
 
-                var fileBytes = File.ReadAllBytes(request.SupportFileMetadata.InvoiceNumber);
-                var fileName = Path.GetFileName(request.SupportFileMetadata.InvoiceNumber);
+                var fileBytes = File.ReadAllBytes(filePath);
+                var fileName = Path.GetFileName(filePath);
 
                 using (var content = new MultipartFormDataContent())
                 {
