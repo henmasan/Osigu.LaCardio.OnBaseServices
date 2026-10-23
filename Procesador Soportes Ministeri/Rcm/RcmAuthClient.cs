@@ -21,7 +21,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
         private static readonly HttpClient _httpClient = new HttpClient();
         private readonly RcmApiSettings _settings;
         private RcmAuthToken _cachedToken;
-        private DateTime _tokenExpiresAt = DateTime.MinValue;
+        private DateTime _tokenExpiresAt = DateTime.MinValue.AddDays(1);
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
         public RcmAuthClient(RcmApiSettings settings)

@@ -237,7 +237,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
                 }
 
                 var failedFilePath = Path.Combine(failedDir, Path.GetFileName(filePath));
-                File.Move(filePath, failedFilePath, true);
+                File.Move(filePath, failedFilePath);
             }
             catch
             {

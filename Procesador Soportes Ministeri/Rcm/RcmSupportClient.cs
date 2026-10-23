@@ -54,7 +54,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
 
                     var settings = new JsonSerializerSettings
                     {
-                        ContractResolver = new SnakeCaseNamingStrategy(),
+                        ContractResolver = new DefaultContractResolver { NamingStrategy = new SnakeCaseNamingStrategy() },
                         NullValueHandling = NullValueHandling.Ignore
                     };
                     var requestJson = JsonConvert.SerializeObject(request, settings);

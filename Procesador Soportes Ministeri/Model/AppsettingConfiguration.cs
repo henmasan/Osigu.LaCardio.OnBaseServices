@@ -21,7 +21,9 @@ namespace ProcesadorSoportesMinisterio.Model
         public List<FileParameters> FileParameters { get; set; }
         public DestinationData DestinationData { get; set; }
         public string RcmStagingPath { get; set; }
+        public string NotFoundPath { get; set; }
         public bool SendSupportToRcmEnabled { get; set; }
+        public bool GetSupportWorkerEnabled { get; set; }
 
     }
 

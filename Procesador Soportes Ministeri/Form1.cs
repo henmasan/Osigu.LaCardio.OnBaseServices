@@ -21,6 +21,7 @@ namespace ProcesadorSoportesMinisterio
         private string Estado;
         private AppsettingConfiguration _appSettings;
         private ISupportTraceStore _traceStore;
+        private INotFoundSupportStore _notFoundStore;
         private ISendSupportToRcm _sendSupportToRcm;
         private bool _rcmProcessing = false;
 
@@ -29,7 +30,7 @@ namespace ProcesadorSoportesMinisterio
             InitializeComponent();
 
             _timer = new Timer();
-            _timer.Interval = Convert.ToInt32(txtTime.Text) * 60000 ;
+            _timer.Interval = Convert.ToInt32(txtTime.Text) * 60000;
             _timer.Tick += OnTimedEvent;
 
             _rcmTimer = new Timer();
@@ -42,16 +43,12 @@ namespace ProcesadorSoportesMinisterio
             if (string.IsNullOrEmpty(Estado))
             {
                 Estado = "Iniciado";
-                txtTime.ReadOnly=true;
+                txtTime.ReadOnly = true;
                 btnProceso.Text = "Detener";
                 InitializeRcmServices();
                 _timer.Start();
-                if (_appSettings?.SendSupportToRcmEnabled == true)
-                {
-                    _rcmTimer.Start();
-                }
             }
-            else if(Estado == "Iniciado")
+            else if (Estado == "Iniciado")
             {
                 Estado = "Detenido";
                 txtTime.ReadOnly = false;
@@ -66,7 +63,7 @@ namespace ProcesadorSoportesMinisterio
                 txtTime.ReadOnly = true;
                 btnProceso.Text = "Detener";
                 _timer.Start();
-                if (_appSettings?.SendSupportToRcmEnabled == true)
+                if (_appSettings?.Configuration?.SendSupportToRcmEnabled == true)
                 {
                     _rcmTimer.Start();
                 }
@@ -88,7 +85,7 @@ namespace ProcesadorSoportesMinisterio
                     _appSettings = LoadAppSettings(path);
                 }
 
-                if (_appSettings?.SendSupportToRcmEnabled == true && _appSettings?.RcmApi != null && _appSettings?.Servinte != null)
+                if (_appSettings?.Configuration?.SendSupportToRcmEnabled == true && _appSettings?.RcmApi != null && _appSettings?.Servinte != null)
                 {
                     string rcmStagingPath = _appSettings.Configuration?.RcmStagingPath;
                     if (string.IsNullOrEmpty(rcmStagingPath))
@@ -134,6 +131,32 @@ namespace ProcesadorSoportesMinisterio
 
         private void OnRcmTimerTick(object sender, EventArgs e)
         {
+            SendSupportToRcm();
+        }
+
+        private string GetAppsettingsPath()
+        {
+            return string.Format($"{System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetModules()[0].FullyQualifiedName)}\\appsettings.json");
+        }
+
+        private AppsettingConfiguration LoadAppSettings(string path)
+        {
+            StringBuilder contentFile = new StringBuilder();
+            using (StreamReader sr = new StreamReader(path))
+            {
+                string line = string.Empty;
+                while ((line = sr.ReadLine()) != null)
+                {
+                    contentFile.AppendLine(line);
+                }
+            }
+
+            string docJson = contentFile.ToString();
+            return JsonConvert.DeserializeObject<AppsettingConfiguration>(docJson);
+        }
+
+        public void SendSupportToRcm()
+        {
             if (_rcmProcessing || _sendSupportToRcm == null)
             {
                 return;
@@ -161,29 +184,8 @@ namespace ProcesadorSoportesMinisterio
             catch (Exception ex)
             {
                 _rcmProcessing = false;
-                // Log error
+
             }
-        }
-
-        private string GetAppsettingsPath()
-        {
-            return string.Format($"{System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetModules()[0].FullyQualifiedName)}\\appsettings.json");
-        }
-
-        private AppsettingConfiguration LoadAppSettings(string path)
-        {
-            StringBuilder contentFile = new StringBuilder();
-            using (StreamReader sr = new StreamReader(path))
-            {
-                string line = string.Empty;
-                while ((line = sr.ReadLine()) != null)
-                {
-                    contentFile.AppendLine(line);
-                }
-            }
-
-            string docJson = contentFile.ToString();
-            return JsonConvert.DeserializeObject<AppsettingConfiguration>(docJson);
         }
 
         public void ProcessSupport()
@@ -196,13 +198,52 @@ namespace ProcesadorSoportesMinisterio
                     _appSettings = LoadAppSettings(path);
                 }
 
-                SearchSupport searchSupport = new SearchSupport(_appSettings.Configuration, _traceStore);
+                if (_notFoundStore == null)
+                {
+                    _notFoundStore = new SqliteNotFoundSupportStore(Path.Combine(_appSettings.Configuration.NotFoundPath, "not_found.db"));
+                }
+
+                SearchSupport searchSupport = new SearchSupport(_appSettings.Configuration, _notFoundStore, _traceStore);
                 searchSupport.FindSupportInFolder();
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void btnEnviarRCM_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(Estado))
+            {
+                Estado = "Iniciado";
+                txtTime.ReadOnly = true;
+                btnEnviarRCM.Text = "Detener";
+                InitializeRcmServices();
+                _rcmTimer.Start();
+
+            }
+            else if (Estado == "Iniciado")
+            {
+                Estado = "Detenido";
+                txtTime.ReadOnly = false;
+                btnEnviarRCM.Text = "Iniciar";
+                _timer.Stop();
+                _rcmTimer.Stop();
+            }
+
+            else if (Estado == "Detenido")
+            {
+                Estado = "Iniciado";
+                txtTime.ReadOnly = true;
+                btnEnviarRCM.Text = "Detener";
+                _timer.Start();
+                if (_appSettings?.Configuration?.SendSupportToRcmEnabled == true)
+                {
+                    _rcmTimer.Start();
+                }
+            }
+            SendSupportToRcm();
         }
 
         //private void buttonStop_Click(object sender, EventArgs e)

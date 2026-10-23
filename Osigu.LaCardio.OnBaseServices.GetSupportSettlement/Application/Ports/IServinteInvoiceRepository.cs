@@ -34,5 +34,6 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports
     public interface IServinteInvoiceRepository
     {
         Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string eadCode);
+        Task<List<ServinteInvoiceInfo>> GetInvoiceWithPrefix(string invoiceNumber);
     }
 }

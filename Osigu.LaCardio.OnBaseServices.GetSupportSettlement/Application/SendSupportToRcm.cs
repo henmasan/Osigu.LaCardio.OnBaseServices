@@ -49,7 +49,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             List<ServinteInvoiceInfo> invoiceInfo = null;
             try
             {
-                invoiceInfo = await _servinteRepository.GetInvoiceInfoAsync(trace.InvoiceNumber, trace.EadCode);
+                invoiceInfo = await _servinteRepository.GetInvoiceWithPrefix(trace.InvoiceNumber);
             }
             catch (Exception ex)
             {
@@ -92,7 +92,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 var groupedInvoicesInfo = SetGroupedInvoice(invoiceInfo);
 
                 var supportFileInfo = GetSupportFileCode(trace.SupportType);
-                var fullInvoiceNumber = $"{trace.EadCode}{trace.InvoiceNumber}";
+                var fullInvoiceNumber = $"{invoiceInfo[0].InvoiceSource}{invoiceInfo[0].InvoiceNumber}";
                 var supportFileMetadata = new SupportFileMetadata
                 {
                     ProcessId = trace.ProcessId,
@@ -155,7 +155,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 trace.ErrorMessage = $"Error: {ex.Message}";
                 trace.Observation = $"Intento {trace.AttemptCount}: Excepción - {ex.GetType().Name}: {ex.Message}";
                 await _traceStore.UpdateTraceAsync(trace);
-                _logger.LogError(ex, $"Error sending support to RCM for invoice {trace.InvoiceNumber}");
+                _logger.LogError(ex, $"Error sending support to RCM for invoice {invoiceInfo[0].InvoiceNumber}");
             }
         }
 

@@ -6,8 +6,11 @@ namespace Scripts_Varios
     {
         static void Main(string[] args)
         {
-            BuscarXmlMederi buscarXmlMederi = new BuscarXmlMederi();
-            buscarXmlMederi.BuscarXml();
+            //BuscarXmlMederi buscarXmlMederi = new BuscarXmlMederi();
+            //buscarXmlMederi.BuscarXml();
+
+            BuscarSoportesCuvHistoricos buscarSoportesCuvHistoricos = new BuscarSoportesCuvHistoricos();
+            buscarSoportesCuvHistoricos.BuscarSoportes();
         }
     }
 }
