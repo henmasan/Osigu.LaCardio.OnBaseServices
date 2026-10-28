@@ -64,11 +64,11 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
             {
                 _logger.LogInformation($"Processing pending support: Invoice={trace.InvoiceNumber}, Type={trace.SupportType}");
 
-                if (trace.AttemptCount >= _rcmSettings.Retries)
+                if (trace.AttemptCount >= _rcmSettings.MaxRetries)
                 {
                     trace.Status = "Failed";
                     trace.ErrorMessage = "Maximum retry attempts exceeded";
-                    trace.Observation = $"Falló: Se excedió el número máximo de reintentos ({_rcmSettings.Retries}). Última observación: {trace.ErrorMessage}";
+                    trace.Observation = $"Falló: Se excedió el número máximo de reintentos ({_rcmSettings.MaxRetries}). Última observación: {trace.ErrorMessage}";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogError($"Max retries exceeded for {trace.InvoiceNumber}");
                     MoveSupportFileToFailed(trace.FilePath);
@@ -136,7 +136,15 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                     trace.Observation = $"Exitoso: Soporte enviado a RCM. RcmId={response.RcmId}";
                     await _traceStore.UpdateTraceAsync(trace);
                     _logger.LogInformation($"Successfully sent {trace.SupportType} to RCM for invoice {trace.InvoiceNumber}, RcmId={response.RcmId}");
-                    DeleteLocalSupportFile(trace.FilePath);
+                    
+                    if(_rcmSettings.DeleteFileAfterUpload)
+                    {
+                        DeleteLocalSupportFile(trace.FilePath);
+                    }
+                    else
+                    {
+                        MoveCompletedSupportFile(trace.FilePath);
+                    }
                 }
                 else
                 {
@@ -156,6 +164,28 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
                 trace.Observation = $"Intento {trace.AttemptCount}: Excepción - {ex.GetType().Name}: {ex.Message}";
                 await _traceStore.UpdateTraceAsync(trace);
                 _logger.LogError(ex, $"Error sending support to RCM for invoice {invoiceInfo[0].InvoiceNumber}");
+            }
+        }
+
+        private void MoveCompletedSupportFile(string? filePath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+                {
+                    return;
+                }
+
+                var completedFolder = Path.Combine(Path.GetDirectoryName(filePath), "completed");
+                Directory.CreateDirectory(completedFolder);
+
+                var destination = Path.Combine(completedFolder, Path.GetFileName(filePath));
+                File.Move(filePath, destination, overwrite: true);
+                _logger.LogInformation($"Archivo movido a carpeta completed: {destination}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error al mover archivo a carpeta completed {filePath}");
             }
         }
 

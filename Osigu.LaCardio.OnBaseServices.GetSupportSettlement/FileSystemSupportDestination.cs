@@ -57,16 +57,20 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 foreach (var support in supports)
                 {
                     FileInfo fileInfo = new FileInfo(support.SupportLocation);
-
-                    using (StreamWriter writer = new StreamWriter($@"{destinationPath}\Support{invoiceNumber}.txt", true))
+                    if (!_appsetting.Configuration.GetSupportOnBaseEnabled)
                     {
-                        writer.WriteLine(support.SupportIndexInfo);
-                    }
 
-                    // Copy original to destination (keeps current behavior).
-                    string destinationFile = $"{destinationPath}/{fileInfo.Name}";
-                    File.Copy(support.SupportLocation, destinationFile, overwrite: true);
-                    _logger.LogInformation($"Archivo copiado a: {destinationFile}");
+                        using (StreamWriter writer = new StreamWriter($@"{destinationPath}\Support{invoiceNumber}.txt", true))
+                        {
+                            writer.WriteLine(support.SupportIndexInfo);
+                        }
+
+                        // Copy original to destination (keeps current behavior).
+                        string destinationFile = $"{destinationPath}/{fileInfo.Name}";
+                        File.Copy(support.SupportLocation, destinationFile, overwrite: true);
+                        _logger.LogInformation($"Archivo copiado a: {destinationFile}");
+
+                    }
 
                     // Move original to RCM staging path for later processing.
                     string rcmStagingFile = Path.Combine(rcmStagingPath, fileInfo.Name);

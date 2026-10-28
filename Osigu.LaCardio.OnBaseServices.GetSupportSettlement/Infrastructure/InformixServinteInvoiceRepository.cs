@@ -1,22 +1,25 @@
+using IBM.Data.Db2;
+using Microsoft.Extensions.Logging;
+using Oracle.ManagedDataAccess.Client;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Ports;
 using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration;
-using IBM.Data.Db2;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 
 namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 {
     public class InformixServinteInvoiceRepository : IServinteInvoiceRepository
     {
-        private readonly ServinteSettings _servinteSettings;
+
+        private readonly AppsettingConfiguration _appsetting;
         private readonly ILogger<InformixServinteInvoiceRepository> _logger;
 
-        public InformixServinteInvoiceRepository(ServinteSettings servinteSettings, ILogger<InformixServinteInvoiceRepository> logger)
+        public InformixServinteInvoiceRepository(AppsettingConfiguration appsetting, ILogger<InformixServinteInvoiceRepository> logger)
         {
-            _servinteSettings = servinteSettings;
+            _appsetting = appsetting;
             _logger = logger;
         }
 
@@ -24,7 +27,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
         {
             try
             {
-                using (var connection = new DB2Connection(_servinteSettings.InformixConnectionString))
+                using (var connection = new DB2Connection(_appsetting.Servinte.InformixConnectionString))
                 {
                     await connection.OpenAsync();
 
@@ -81,6 +84,7 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
 
                                 ServinteInvoiceInfo invoiceInfo = new ServinteInvoiceInfo();
 
+                                invoiceInfo.InvoiceNumber = invoiceNumber;
                                 invoiceInfo.InvoiceSource = invoiceSource;
                                 invoiceInfo.InvoiceDate = invoiceDate;
                                 invoiceInfo.Amount = amount;
@@ -100,6 +104,107 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Infrastructure
                 _logger.LogError(ex, $"Error retrieving invoice {invoiceNumber} from Informix Servinte");
                 throw;
             }
+        }
+        public async Task<List<ServinteInvoiceInfo>> GetInvoiceWithPrefix(string invoiceNumber)
+        {
+            var result = new List<ServinteInvoiceInfo>();
+
+            try
+            {
+                int docNumber = Convert.ToInt32(invoiceNumber);
+
+                int attempt = 0;
+                while (attempt < _appsetting.RcmApi.MaxRetries)
+                {
+                    try
+                    {
+                        using (var connection = new OracleConnection(_appsetting.Servinte.ConnectionString))
+                        {
+                            await connection.OpenAsync();
+
+                            var query = @"
+                                SELECT
+                                    c.CARFUE as invoice_source,
+                                    h.MOVDOC as invoice_number,
+                                    h.MOVFEC as invoice_date,
+                                    h.MOVCER as agreement_code,
+                                    c.CARVAL as amount,
+                                    e.ENVFAECUF as electronic_code,
+                                    p.EPIINAEPI as origin_event_id
+                                FROM FAMOV h
+                                LEFT JOIN CACAR c ON c.CARFUE = h.MOVFUE AND c.CARDOC = h.MOVDOC
+                                LEFT JOIN CAENC ca ON ca.ENCFUE = h.MOVFUE AND ca.ENCDOC = h.MOVDOC AND ca.ENCSED = h.MOVEAD
+                                LEFT JOIN FAENVFAE e ON e.ENVFAEFUE = h.MOVFUE AND e.ENVFAEDOC = h.MOVDOC AND e.ENVFAEEAD = h.MOVEAD AND e.ENVFAEERR = 'N'
+                                LEFT JOIN HIEPIINA p ON p.EPIINAHIS = h.MOVHIS AND p.EPIINANUM = h.MOVNUM
+                                WHERE h.MOVEAD = ? AND h.MOVDOC = ?
+                            ";
+
+                            using (var command = connection.CreateCommand())
+                            {
+                                command.CommandTimeout = 600;
+                                command.Parameters.Add(new OracleParameter("@doc", docNumber));
+
+                                using (var reader = await command.ExecuteReaderAsync())
+                                {
+                                    while (await reader.ReadAsync())
+                                    {
+                                        var info = new ServinteInvoiceInfo
+                                        {
+                                            InvoiceNumber = docNumber.ToString(),
+                                            InvoiceSource = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                                            InvoiceDate = reader.IsDBNull(1) ? DateTime.MinValue : reader.GetDateTime(1),
+                                            AgreementCode = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                                            Amount = reader.IsDBNull(3) ? 0m : Convert.ToDecimal(reader.GetValue(3)),
+                                            InvoiceElectronicCode = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                                            OriginEventId = reader.IsDBNull(5) ? string.Empty : reader.GetInt32(5).ToString()
+                                        };
+                                        result.Add(info);
+                                    }
+                                }
+                            }
+                        }
+                        break; // Conexión exitosa, salir del loop de reintentos
+                    }
+                    catch (OracleException oracleEx) when (attempt < _appsetting.RcmApi.MaxRetries - 1)
+                    {
+                        attempt++;
+                        System.Diagnostics.Debug.WriteLine($"Intento {attempt} falló: {oracleEx.Message}. Reintentando en {_appsetting.RcmApi.RetriesDelay}ms...");
+                        await Task.Delay(_appsetting.RcmApi.RetriesDelay);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                StringBuilder errorMsg = new StringBuilder();
+                errorMsg.AppendLine("Error al conectar con la base de datos Informix (ODBC):");
+                errorMsg.AppendLine($"Mensaje: {ex.Message}");
+
+                if (ex.InnerException != null)
+                {
+                    errorMsg.AppendLine($"Inner Exception: {ex.InnerException.Message}");
+                }
+
+                errorMsg.AppendLine($"Cadena de conexión (parcial): {MaskConnectionString(_appsetting.Servinte.ConnectionString)}");
+                errorMsg.AppendLine($"Factura: {invoiceNumber}");
+
+                System.Diagnostics.Debug.WriteLine(errorMsg.ToString());
+                throw;
+            }
+
+            return result;
+        }
+
+        private string MaskConnectionString(string connStr)
+        {
+            if (string.IsNullOrEmpty(connStr))
+                return "";
+
+            // Ocultar la contraseña por seguridad
+            return System.Text.RegularExpressions.Regex.Replace(
+                connStr,
+                @"(PWD|PASSWORD|Pwd)=([^;]+)",
+                "$1=***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
     }
 }

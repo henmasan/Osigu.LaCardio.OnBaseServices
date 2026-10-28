@@ -13,7 +13,8 @@ namespace ProcesadorSoportesMinisterio.Model
         public string ClientSecret { get; set; }
         public string AuthPath { get; set; }
         public string UploadPath { get; set; }
-        public int Retries { get; set; }
+        public int MaxRetries { get; set; }
+        public int RetriesDelay { get; set; }
         public int MaxConcurrentUploads { get; set; }
         public int TokenExpiration { get; set; }
     }

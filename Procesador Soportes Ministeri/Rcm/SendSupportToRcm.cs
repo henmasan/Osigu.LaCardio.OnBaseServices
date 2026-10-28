@@ -102,7 +102,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
         {
             try
             {
-                if (trace.AttemptCount >= _rcmSettings.Retries)
+                if (trace.AttemptCount >= _rcmSettings.MaxRetries)
                 {
                     trace.Status = "Failed";
                     trace.ErrorMessage = "Maximum retry attempts exceeded";

@@ -9,9 +9,12 @@ namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Configuration
     public class AppsettingConfiguration
     {
         public Configuration Configuration { get; set; }
+        public RcmApiSettings RcmApi { get; set; }
+        public ServinteSettings Servinte { get; set; }
     }
     public class Configuration
     {
+        public bool GetSupportOnBaseEnabled { get; set; }
         public bool GetSupportWorkerEnabled { get; set; }
         public bool SendSupportToRcmWorkerEnabled { get; set; }
         public string ConnectionString { get; set; }

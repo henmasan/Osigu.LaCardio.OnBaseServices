@@ -13,8 +13,9 @@ using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application.Util;
 using Ionic.Zip;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application;
 
-namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Application
+namespace Osigu.LaCardio.OnBaseServices.GetSupportSettlement.Workers
 {
 
     public class SearchSupport : ISearchSupport

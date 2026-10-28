@@ -41,6 +41,7 @@ namespace Scripts_Varios
                 {
                     busqueda.Existe = true;
                 }
+
                 else
                 {
                     busqueda.Existe = false;
@@ -86,10 +87,15 @@ namespace Scripts_Varios
                         datosArchivo.DirectorioBusqueda = directorio;
                         datosArchivo.existe = true;
                         listaDatosArchivosBusqueda.Add(datosArchivo);
+                        string nuevaRutaSalida = Path.Combine(rutaSalida, directorio.Name);
+                        if(!Directory.Exists(nuevaRutaSalida))
+                        {
+                            Directory.CreateDirectory(nuevaRutaSalida);
+                        }
 
                         try
                         {
-                            File.Copy(archivo.FullName, Path.Combine(rutaSalida, nuevoNombreArchivo));
+                            File.Copy(archivo.FullName, Path.Combine(nuevaRutaSalida, nuevoNombreArchivo));
                             datosArchivo.copiado = true;
                         }
                         catch (Exception ex)

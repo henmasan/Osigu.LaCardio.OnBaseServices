@@ -45,7 +45,7 @@ namespace ProcesadorSoportesMinisterio
                 Estado = "Iniciado";
                 txtTime.ReadOnly = true;
                 btnProceso.Text = "Detener";
-                InitializeRcmServices();
+                //InitializeRcmServices();
                 _timer.Start();
             }
             else if (Estado == "Iniciado")
@@ -98,11 +98,11 @@ namespace ProcesadorSoportesMinisterio
                     IServinteInvoiceRepository servinteRepository;
                     if (_appSettings.Servinte?.DatabaseOrigin?.Equals("Informix", StringComparison.OrdinalIgnoreCase) == true)
                     {
-                        servinteRepository = new InformixServinteInvoiceRepository(_appSettings.Servinte.InformixConnectionString);
+                        servinteRepository = new InformixServinteInvoiceRepository(_appSettings);
                     }
                     else
                     {
-                        servinteRepository = new OracleServinteInvoiceRepository(_appSettings.Servinte.ConnectionString);
+                        servinteRepository = new OracleServinteInvoiceRepository(_appSettings);
                     }
 
                     var rcmAuthClient = new RcmAuthClient(_appSettings.RcmApi);

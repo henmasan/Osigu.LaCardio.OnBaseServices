@@ -12,27 +12,15 @@ namespace ProcesadorSoportesMinisterio.Rcm
     public class InformixServinteInvoiceRepository : IServinteInvoiceRepository
     {
         private readonly string _connectionString;
-        private const int MaxRetries = 3;
-        private const int RetryDelayMs = 1000;
-
-        public InformixServinteInvoiceRepository(string connectionString)
+        private AppsettingConfiguration _appsetting;
+        public InformixServinteInvoiceRepository(AppsettingConfiguration appsetting)
         {
-            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
-            ValidateConnectionString();
+            _connectionString =appsetting.Servinte.ConnectionString;
+            _appsetting = appsetting ?? throw new ArgumentNullException(nameof(appsetting));
+          
         }
 
-        private void ValidateConnectionString()
-        {
-            if (string.IsNullOrWhiteSpace(_connectionString))
-                throw new InvalidOperationException("La cadena de conexión Informix está vacía o nula.");
-
-            // Validar que sea una conexión ODBC válida (DSN o connection string ODBC)
-            bool hasDsn = _connectionString.IndexOf("DSN=", StringComparison.OrdinalIgnoreCase) >= 0;
-            bool hasDriver = _connectionString.IndexOf("Driver=", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            if (!hasDsn && !hasDriver)
-                throw new InvalidOperationException("La cadena de conexión ODBC debe contener 'DSN=' o 'Driver='.");
-        }
+ 
 
         public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string eadCode)
         {
@@ -43,7 +31,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
                 int docNumber = Convert.ToInt32(invoiceNumber);
 
                 int attempt = 0;
-                while (attempt < MaxRetries)
+                while (attempt < _appsetting.RcmApi.MaxRetries)
                 {
                     try
                     {
@@ -91,13 +79,13 @@ namespace ProcesadorSoportesMinisterio.Rcm
                                 }
                             }
                         }
-                        break; // Conexión exitosa, salir del loop de reintentos
+                        break; 
                     }
-                    catch (OdbcException odbcEx) when (attempt < MaxRetries - 1)
+                    catch (OdbcException odbcEx) when (attempt < _appsetting.RcmApi.MaxRetries - 1)
                     {
                         attempt++;
-                        System.Diagnostics.Debug.WriteLine($"Intento {attempt} falló: {odbcEx.Message}. Reintentando en {RetryDelayMs}ms...");
-                        await Task.Delay(RetryDelayMs);
+                        System.Diagnostics.Debug.WriteLine($"Intento {attempt} falló: {odbcEx.Message}. Reintentando en {_appsetting.RcmApi.RetriesDelay}ms...");
+                        await Task.Delay(_appsetting.RcmApi.RetriesDelay);
                     }
                 }
             }
@@ -130,7 +118,7 @@ namespace ProcesadorSoportesMinisterio.Rcm
                 int docNumber = Convert.ToInt32(invoiceNumber);
 
                 int attempt = 0;
-                while (attempt < MaxRetries)
+                while (attempt < _appsetting.RcmApi.MaxRetries)
                 {
                     try
                     {
@@ -181,11 +169,11 @@ namespace ProcesadorSoportesMinisterio.Rcm
                         }
                         break; // Conexión exitosa, salir del loop de reintentos
                     }
-                    catch (OdbcException odbcEx) when (attempt < MaxRetries - 1)
+                    catch (OdbcException odbcEx) when (attempt < _appsetting.RcmApi.MaxRetries - 1)
                     {
                         attempt++;
-                        System.Diagnostics.Debug.WriteLine($"Intento {attempt} falló: {odbcEx.Message}. Reintentando en {RetryDelayMs}ms...");
-                        await Task.Delay(RetryDelayMs);
+                        System.Diagnostics.Debug.WriteLine($"Intento {attempt} falló: {odbcEx.Message}. Reintentando en {_appsetting.RcmApi.RetriesDelay}ms...");
+                        await Task.Delay(_appsetting.RcmApi.RetriesDelay);
                     }
                 }
             }

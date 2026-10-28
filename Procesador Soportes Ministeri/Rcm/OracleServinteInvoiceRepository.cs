@@ -12,10 +12,12 @@ namespace ProcesadorSoportesMinisterio.Rcm
     public class OracleServinteInvoiceRepository : IServinteInvoiceRepository
     {
         private readonly string _connectionString;
+        private readonly AppsettingConfiguration _appsetting;
 
-        public OracleServinteInvoiceRepository(string connectionString)
+        public OracleServinteInvoiceRepository(AppsettingConfiguration appsetting)
         {
-            _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+            _appsetting = appsetting ?? throw new ArgumentNullException(nameof(appsetting));
+            _connectionString = appsetting.Servinte.ConnectionString ?? throw new ArgumentNullException(nameof(appsetting.Servinte.ConnectionString));
         }
 
         public async Task<List<ServinteInvoiceInfo>> GetInvoiceInfoAsync(string invoiceNumber, string eadCode)
@@ -26,7 +28,10 @@ namespace ProcesadorSoportesMinisterio.Rcm
             {
                 int docNumber = Convert.ToInt32(invoiceNumber);
 
-                using (var connection = new OracleConnection(_connectionString))
+                int attempt = 0;
+                while (attempt < _appsetting.RcmApi.MaxRetries)
+  
+                    using (var connection = new OracleConnection(_connectionString))
                 {
                     await connection.OpenAsync();
 
